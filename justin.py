@@ -1,18 +1,10 @@
 # %% Import
 
-import pandas as pd
-import matplotlib.pyplot as plt
 import altair as alt
-import pymc as pm
-import arviz as az
-
-import torch
-import torch.nn.functional as F
-import pyro
-import pyro.distributions as dist
-import pyro.distributions.constraints as constraints
-
-import logging
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import scipy.stats as stats
 
 # %% Load (wide) data
 
@@ -103,133 +95,70 @@ long
 
 data = (
     long.groupby(["userID", "interface"])
-    .agg({"timesRan": "sum", "timesUsed": "sum", "taskTime": "sum", "correct": "all"})
+    .agg(
+        {
+            "timesRan": "sum",
+            "timesUsed": "sum",
+            "taskTime": "sum",
+            "correct": "all",
+        }
+    )
     .reset_index()
 )
 
-correct = data[data["correct"]].copy()
+correct = data[data["correct"]]
 
-INTERFACE_LIST = list(correct["interface"].unique())
-correct["i"] = correct["interface"].apply(lambda i: INTERFACE_LIST.index(i))
-
-# %% Bayes
-
-
-def model(times, interfaces):
-    # y = mx + b
-    # m = pyro.sample("m", dist.Normal(0, 10))
-    # b = pyro.sample("b", dist.Normal(0, 10))
-    # with pyro.plate("N", len(interfaces)):
-    #     pyro.sample("y_i", dist.Normal(m * interfaces + b, 5), obs=times)
-    beta_0 = pyro.sample("beta_0", dist.Gamma(30, 1))
-    sigma_y = pyro.sample("sigma_y", dist.Uniform(1, 50))
-
-    with pyro.plate("J", len(INTERFACE_LIST)):
-        sigma_beta = pyro.sample("sigma_beta", dist.Gamma(10, 1))
-        beta_j = pyro.sample("beta_j", dist.Normal(0, sigma_beta))
-    with pyro.plate("N", len(interfaces)):
-        mu_i = beta_0 + beta_j[interfaces]
-        pyro.sample("y_i", dist.Normal(mu_i, sigma_y), obs=times)
-
-
-times = torch.tensor(correct["taskTime"].values)
-interfaces = torch.tensor(correct["i"].values)
-
-pyro.render_model(
-    model,
-    model_args=(times, interfaces),
-    filename="model.pdf",
-    render_distributions=True,
-)
-
-pyro.clear_param_store()
-
-auto_guide = pyro.infer.autoguide.AutoNormal(model)
-adam = pyro.optim.Adam({"lr": 0.02})
-elbo = pyro.infer.Trace_ELBO()
-svi = pyro.infer.SVI(model, auto_guide, adam, elbo)
-
-losses = []
-for step in range(2000):
-    loss = svi.step(times, interfaces)
-    losses.append(loss)
-    if step % 200 == 0:
-        print("Elbo loss: {}".format(loss))
-
-predictive = pyro.infer.Predictive(model, guide=auto_guide, num_samples=800)
-samples = predictive(None, interfaces)
-
-# %%
-
-u = samples["beta_j"]
-deflection = pd.DataFrame(
-    {
-        "avg": u.mean(0).detach().cpu().numpy(),
-        "lo": u.kthvalue(int(len(u) * 0.05), dim=0)[0].detach().cpu().numpy(),
-        "hi": u.kthvalue(int(len(u) * 0.95), dim=0)[0].detach().cpu().numpy(),
-    }
-)
-deflection["interface"] = deflection.index.map(lambda i: INTERFACE_LIST[i])
-
-# %% Distribution of
-
-interfaces = [
-    "Unfamiliar Only",
-    "Translation",
-    "Probe–Mapping",
-    "Probe–Components",
-    "Probe–Translation Steps",
-    "Probe–NL Translation Explanation",
-    "NL",
-]
-
-alt.layer(
-    alt.Chart()
-    .mark_point(color="black", filled=True)
-    .encode(
-        x="mean(taskTime):Q",
-        y=alt.Y("interface:N", sort=order),
-    ),
-    alt.Chart()
-    .mark_errorbar(extent="ci")
-    .encode(
-        x="taskTime:Q",
-        y=alt.Y("interface:N", sort=order),
-    ),
-    data=correct,
-).interactive().save("chart1.html")
-
-# %% Distribution of
+# %% Distribution of task times
+# Right skewed so we should use median.
 
 (
     alt.Chart(correct)
-    .mark_bar()
-    .encode(
-        x=alt.X("taskTime", bin=True),
-        y="count()",
+    .transform_density(
+        density="taskTime",
+        groupby=["interface"],
+        as_=["taskTime", "density"],
     )
-    .facet(row="interface")
+    .mark_area(interpolate="monotone")
+    .encode(
+        alt.X("taskTime:Q"),
+        alt.Y("density:Q"),
+    )
+    .facet(
+        row=alt.Row("interface:N")
+        .title(None)
+        .header(labelAngle=0, labelAlign="left", format="%B")
+    )
+    # .properties(bounds="flush")
+    # .configure_facet(spacing=0)
+    # .configure_view(stroke=None)
+    # .configure_title(anchor="end")
     .interactive()
-    .save("chart2.html")
+    .save("taskTimes.html")
 )
 
-# %%
 
-order = [
-    "Unfamiliar Only",
-    "Translation",
-    "Probe–Mapping",
-    "Probe–Components",
-    "Probe–Translation Steps",
-    "Probe–NL Translation Explanation",
-    "NL",
-]
+# %% Bootstrap
+
+lows = []
+highs = []
+inters = []
+meds = []
+
+for i, g in correct.groupby("interface"):
+    vals = g["taskTime"].values
+    inters.append(i)
+    res = stats.bootstrap((vals,), np.median, n_resamples=10_000)
+    lows.append(res.confidence_interval.low)
+    highs.append(res.confidence_interval.high)
+    meds.append(np.median(vals))
+
+df = pd.DataFrame({"interface": inters, "lo": lows, "hi": highs, "med": meds})
 
 alt.layer(
     alt.Chart()
     .mark_point(color="black", filled=True)
     .encode(
-        x="avg:Q",
+        x="med:Q",
         y=alt.Y("interface:N", sort=order),
     ),
     alt.Chart()
@@ -239,5 +168,5 @@ alt.layer(
         x2="hi:Q",
         y=alt.Y("interface:N", sort=order),
     ),
-    data=deflection,
-).interactive().save("chart3.html")
+    data=df,
+).interactive().save("chart4.html")

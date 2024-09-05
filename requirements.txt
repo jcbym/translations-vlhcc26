@@ -4,3 +4,4 @@ numpy
 altair
 pyro-ppl
 arviz
+scipy
