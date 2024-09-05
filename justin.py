@@ -6,6 +6,21 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 
+
+# %% Define interfaces and order
+
+INTERFACES = [
+    ("control", "Unfamiliar Only"),
+    ("translation", "Translation"),
+    # "Probe–Mapping",
+    ("canonicalization", "Probe–Components"),
+    ("sequence", "Probe–Translation Steps"),
+    ("llmTranslation", "Probe–NL Translation Explanation"),
+    ("llmBasic", "NL"),
+]
+
+INTERFACE_ORDER = [label for (_, label) in INTERFACES]
+
 # %% Load (wide) data
 
 wide = pd.read_csv(
@@ -31,16 +46,7 @@ wide = pd.read_csv(
     ]
 ]
 
-wide["interface"] = wide["interface"].replace(
-    {
-        "canonicalization": "Probe–Components",
-        "control": "Unfamiliar Only",
-        "llmBasic": "NL",
-        "llmTranslation": "Probe–NL Translation Explanation",
-        "sequence": "Probe–Translation Steps",
-        "translation": "Translation",
-    }
-)
+wide["interface"] = wide["interface"].replace({k: v for (k, v) in INTERFACES})
 
 for c in [
     "timesRan1",
@@ -159,14 +165,80 @@ alt.layer(
     .mark_point(color="black", filled=True)
     .encode(
         x="med:Q",
-        y=alt.Y("interface:N", sort=order),
+        y=alt.Y("interface:N", sort=INTERFACE_ORDER),
     ),
     alt.Chart()
     .mark_errorbar(extent="ci")
     .encode(
         x="lo:Q",
         x2="hi:Q",
-        y=alt.Y("interface:N", sort=order),
+        y=alt.Y("interface:N", sort=INTERFACE_ORDER),
     ),
     data=df,
-).interactive().save("chart4.html")
+).interactive().save("bootstrap_median.html")
+
+# %%
+
+
+# https://glowingpython.blogspot.com/2020/03/ridgeline-plots-in-pure-matplotlib.html
+def ridgeline(ax, data, overlap=0, fill=True, labels=None, n_points=150):
+    """
+    Creates a standard ridgeline plot.
+
+    data, list of lists.
+    overlap, overlap between distributions. 1 max overlap, 0 no overlap.
+    fill, matplotlib color to fill the distributions.
+    n_points, number of points to evaluate each distribution function.
+    labels, values to place on the y axis to describe the distributions.
+    """
+    if overlap > 1 or overlap < 0:
+        raise ValueError("overlap must be in [0 1]")
+    xx = np.linspace(0, np.max(np.concatenate(data)), n_points)
+    dom = np.arange(0, 91, 10)
+    ax.set_xticks(dom)
+    curves = []
+    ys = []
+    for i, d in enumerate(data):
+        # pdf = stats.gaussian_kde(d)
+        y = i * (1.0 - overlap)
+        yNext = (i + 1) * (1.0 - overlap)
+        ys.append(y)
+        ax.hist(
+            d,
+            bins=dom,
+            density=True,
+            bottom=y,
+            color="gray",  # (i / len(data), 0, 0),
+            edgecolor="black",
+            zorder=len(data) - i + 1,
+        )
+        # curve = pdf(xx)
+        # if fill:
+        #     ax.fill_between(
+        #         xx,
+        #         np.ones(n_points) * y,
+        #         curve + y,
+        #         zorder=len(data) - i + 1,
+        #         color=fill,
+        #     )
+        # ax.plot(xx, curve + y, c="k", zorder=len(data) - i + 1)
+        ax.axhline(y, c="black")
+        med = np.median(d)
+        mean = np.mean(d)
+        ax.plot((med, med), (y, yNext), color="red")
+        ax.plot((mean, mean), (y, yNext), color="blue")
+    if labels:
+        ax.set_yticks(ys, labels)
+
+
+res = []
+for i, g in correct.groupby("interface"):
+    res.append((INTERFACE_ORDER.index(i), i, g["taskTime"]))
+
+res.sort(reverse=True)
+_, labels, d = zip(*res)
+fig, ax = plt.subplots(1, 1, figsize=(10, 7))
+ridgeline(ax, d, overlap=0.95, fill="gray", labels=labels)
+fig.tight_layout()
+ax.spines[["left", "right", "top"]].set_visible(False)
+plt.savefig("ridge.pdf")
