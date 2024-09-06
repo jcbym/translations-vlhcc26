@@ -1,6 +1,7 @@
 # %% Import
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
@@ -9,16 +10,17 @@ import scipy.stats as stats
 # %% Define interfaces and order
 
 INTERFACES = [
-    ("control", "Unfamiliar Only"),
-    ("translation", "Translation"),
+    ("control", "Unfamiliar Only", 0),
+    ("translation", "Translation", 0),
     # "Probe–Mapping",
-    ("canonicalization", "Probe–Components"),
-    ("sequence", "Probe–Translation Steps"),
-    ("llmTranslation", "Probe–NL Translation Explanation"),
-    ("llmBasic", "NL"),
+    ("canonicalization", "Probe–Components", 1),
+    ("sequence", "Probe–Translation Steps", 1),
+    ("llmTranslation", "Probe–NL Translation Explanation", 1),
+    ("llmBasic", "NL Explanation", 2),
 ]
 
-INTERFACE_ORDER = [label for (_, label) in INTERFACES]
+INTERFACE_ORDER = [label for (_, label, _) in INTERFACES]
+EXPERIMENTS = {i: e for (_, i, e) in INTERFACES}
 
 # %% Load (wide) data
 
@@ -45,7 +47,7 @@ wide = pd.read_csv(
     ]
 ]
 
-wide["interface"] = wide["interface"].replace({k: v for (k, v) in INTERFACES})
+wide["interface"] = wide["interface"].replace({k: v for (k, v, _) in INTERFACES})
 
 for c in [
     "timesRan1",
@@ -92,7 +94,9 @@ long = pd.wide_to_long(
     ["timesRan", "timesUsed", "taskTime", "correct"],
     i=["userID", "interface"],
     j="task",
-)
+).reset_index()
+
+long["score"] = long["correct"].astype(float) / 3
 
 long
 
@@ -106,17 +110,27 @@ data = (
             "timesUsed": "sum",
             "taskTime": "sum",
             "correct": "all",
+            "score": "sum",
         }
     )
     .reset_index()
 )
 
-correct = data[data["correct"]]
-
 # %% Distribution of features
 
 
-def plot_hist(df, feature, lo, hi, step):
+def plot_hist(
+    df,
+    feature,
+    lo,
+    hi,
+    step,
+    *,
+    correct_only,
+):
+    if correct_only:
+        df = df[df["correct"]]
+
     fig, ax = plt.subplots(
         len(INTERFACE_ORDER),
         1,
@@ -169,17 +183,42 @@ def plot_hist(df, feature, lo, hi, step):
     ax[-1].set_xlabel(r"$\bf{" + feature + r"}$", fontsize=10)
     # ax[1].set_ylabel(r"$\bf Relative\ frequency$", fontsize=10)
 
-    fig.savefig(f"output/distribution-{feature}.pdf")
+    fig.savefig(f"output/distribution-c{correct_only}-{feature}.pdf")
 
 
-plot_hist(correct, "taskTime", 0, 90, 10)
-plot_hist(data, "correct", 0, 1, 0.2)
+plot_hist(data, "taskTime", 0, 90, 10, correct_only=True)
+plot_hist(data, "correct", 0, 1, 0.2, correct_only=False)
+plot_hist(data, "score", 0, 1, 0.2, correct_only=False)
 
 
 # %% Bootstrap feature estimators
 
 
-def bootstrap_forest(df, feature, estimator, lo, hi, step, spacing=0.5):
+# Color-blind-friendly color schemes: https://personal.sron.nl/~pault/
+
+
+def bootstrap_forest(
+    df,
+    *,
+    feature,
+    estimator,
+    lo,
+    hi,
+    step,
+    correct_only,
+    spacing=0.5,
+    experiment_colors={
+        0: "#004488",
+        1: "#BB5566",
+        2: "#DDAA33",
+    },
+    xlabel=None,
+    xformatter=None,
+    text_format=None,
+):
+    if correct_only:
+        df = df[df["correct"]]
+
     estimator_name = estimator.__name__
 
     fig, ax = plt.subplots(1, 1, figsize=(8, 3))
@@ -189,8 +228,15 @@ def bootstrap_forest(df, feature, estimator, lo, hi, step, spacing=0.5):
     lows = []
     highs = []
     estimates = []
+    colors = []
 
-    for i, interface in enumerate(reversed(INTERFACE_ORDER)):
+    coord = 0
+    prev_experiment = None
+    for interface in reversed(INTERFACE_ORDER):
+        experiment = EXPERIMENTS[interface]
+        if experiment != prev_experiment:
+            coord += spacing
+
         vals = df[df["interface"] == interface][feature].values
         result = stats.bootstrap(
             (vals,),
@@ -201,11 +247,15 @@ def bootstrap_forest(df, feature, estimator, lo, hi, step, spacing=0.5):
             method="BCa",
             random_state=0,
         )
-        coords.append(i + spacing)
+        coords.append(coord)
         interfaces.append(interface)
         lows.append(result.confidence_interval.low)
         highs.append(result.confidence_interval.high)
         estimates.append(estimator(vals))
+        colors.append(experiment_colors[experiment])
+
+        coord += 1
+        prev_experiment = experiment
 
     df = pd.DataFrame(
         {
@@ -214,30 +264,97 @@ def bootstrap_forest(df, feature, estimator, lo, hi, step, spacing=0.5):
             "low": lows,
             "high": highs,
             "estimate": estimates,
+            "color": colors,
         }
     )
 
-    ax.errorbar(
-        df["estimate"],
-        df["coord"],
-        xerr=[df["estimate"] - df["low"], df["high"] - df["estimate"]],
-        fmt="o",
-        color="black",
-    )
+    for _, row in df.iterrows():
+        ax.errorbar(
+            [row["estimate"]],
+            [row["coord"]],
+            xerr=[[row["estimate"] - row["low"]], [row["high"] - row["estimate"]]],
+            color=row["color"],
+            fmt="o",
+        )
+
+        if text_format:
+            hpad = text_format["hpad"]
+            f = text_format["formatter"]
+            alpha = 0.5
+
+            ax.text(
+                row["low"] - hpad,
+                row["coord"],
+                f(row["low"]),
+                va="center",
+                ha="right",
+                color=row["color"],
+                alpha=alpha,
+            )
+            ax.text(
+                row["estimate"],
+                row["coord"] + 0.15,
+                f(row["estimate"]),
+                va="bottom",
+                ha="center",
+                color=row["color"],
+                alpha=alpha,
+            )
+            ax.text(
+                row["high"] + hpad,
+                row["coord"],
+                f(row["high"]),
+                va="center",
+                ha="left",
+                color=row["color"],
+                alpha=alpha,
+            )
 
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
     ax.set_xlim(lo, hi)
     ax.set_xticks(np.arange(lo, hi + 0.0000001, step))
-    ax.set_xlabel(f"{estimator_name} {feature}", fontweight="bold")
+    if xformatter:
+        ax.xaxis.set_major_formatter(xformatter)
+    ax.set_xlabel(xlabel if xlabel else f"$\\mathbf{{{estimator_name}\\ {feature}}}$")
 
     ax.set_ylim(df["coord"].min() - spacing, df["coord"].max() + spacing)
     ax.set_yticks(df["coord"], labels=df["interface"])
+    for t in ax.yaxis.get_ticklabels():
+        t.set_color(experiment_colors[EXPERIMENTS[t.get_text()]])
 
     fig.tight_layout()
-    fig.savefig(f"output/forest-{feature}-{estimator_name}.pdf")
+    fig.savefig(f"output/forest-c{correct_only}-{feature}-{estimator_name}.pdf")
 
 
-bootstrap_forest(correct, "taskTime", np.median, 0, 90, 10)
-bootstrap_forest(data, "correct", np.mean, 0, 1, 0.2)
+bootstrap_forest(
+    data,
+    feature="taskTime",
+    estimator=np.median,
+    lo=0,
+    hi=60,
+    step=10,
+    correct_only=True,
+    xlabel=r"$\mathbf{Median\ time\ taken}\ \text{(min.)},\, \it{lower}\ \text{is\ better}$",
+    text_format={
+        "hpad": 0.8,
+        "formatter": lambda x: str(round(x, 1)),
+    },
+)
+
+bootstrap_forest(
+    data,
+    feature="score",
+    estimator=np.mean,
+    lo=0,
+    hi=1,
+    step=0.1,
+    correct_only=False,
+    xlabel=r"$\mathbf{Percent\ correct},\, \it{higher}\ \text{is\ better}$",
+    xformatter=ticker.PercentFormatter(xmax=1),
+    text_format={
+        "hpad": 0.01,
+        "formatter": lambda x: str(int(round(x, 2) * 100)) + "%",
+    },
+)
