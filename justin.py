@@ -1,6 +1,5 @@
 # %% Import
 
-import altair as alt
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -114,131 +113,131 @@ data = (
 
 correct = data[data["correct"]]
 
-# %% Distribution of task times
-# Right skewed so we should use median.
+# %% Distribution of features
 
-(
-    alt.Chart(correct)
-    .transform_density(
-        density="taskTime",
-        groupby=["interface"],
-        as_=["taskTime", "density"],
+
+def plot_hist(df, feature, lo, hi, step):
+    fig, ax = plt.subplots(
+        len(INTERFACE_ORDER),
+        1,
+        figsize=(7, 6),
+        layout="constrained",
     )
-    .mark_area(interpolate="monotone")
-    .encode(
-        alt.X("taskTime:Q"),
-        alt.Y("density:Q"),
-    )
-    .facet(
-        row=alt.Row("interface:N")
-        .title(None)
-        .header(labelAngle=0, labelAlign="left", format="%B")
-    )
-    # .properties(bounds="flush")
-    # .configure_facet(spacing=0)
-    # .configure_view(stroke=None)
-    # .configure_title(anchor="end")
-    .interactive()
-    .save("taskTimes.html")
-)
+    fig.get_layout_engine().set(hspace=0.05)
 
+    yticks = [0, 0.25, 0.5, 0.75, 1]
+    yticklabels = ["0%", "", "50%", "", "100%"]
 
-# %% Bootstrap
-
-lows = []
-highs = []
-inters = []
-meds = []
-
-for i, g in correct.groupby("interface"):
-    vals = g["taskTime"].values
-    inters.append(i)
-    res = stats.bootstrap((vals,), np.median, n_resamples=10_000)
-    lows.append(res.confidence_interval.low)
-    highs.append(res.confidence_interval.high)
-    meds.append(np.median(vals))
-
-df = pd.DataFrame({"interface": inters, "lo": lows, "hi": highs, "med": meds})
-
-alt.layer(
-    alt.Chart()
-    .mark_point(color="black", filled=True)
-    .encode(
-        x="med:Q",
-        y=alt.Y("interface:N", sort=INTERFACE_ORDER),
-    ),
-    alt.Chart()
-    .mark_errorbar(extent="ci")
-    .encode(
-        x="lo:Q",
-        x2="hi:Q",
-        y=alt.Y("interface:N", sort=INTERFACE_ORDER),
-    ),
-    data=df,
-).interactive().save("bootstrap_median.html")
-
-# %%
-
-
-# https://glowingpython.blogspot.com/2020/03/ridgeline-plots-in-pure-matplotlib.html
-def ridgeline(ax, data, overlap=0, fill=True, labels=None, n_points=150):
-    """
-    Creates a standard ridgeline plot.
-
-    data, list of lists.
-    overlap, overlap between distributions. 1 max overlap, 0 no overlap.
-    fill, matplotlib color to fill the distributions.
-    n_points, number of points to evaluate each distribution function.
-    labels, values to place on the y axis to describe the distributions.
-    """
-    if overlap > 1 or overlap < 0:
-        raise ValueError("overlap must be in [0 1]")
-    xx = np.linspace(0, np.max(np.concatenate(data)), n_points)
-    dom = np.arange(0, 91, 10)
-    ax.set_xticks(dom)
-    curves = []
-    ys = []
-    for i, d in enumerate(data):
-        # pdf = stats.gaussian_kde(d)
-        y = i * (1.0 - overlap)
-        yNext = (i + 1) * (1.0 - overlap)
-        ys.append(y)
-        ax.hist(
-            d,
-            bins=dom,
-            density=True,
-            bottom=y,
-            color="gray",  # (i / len(data), 0, 0),
+    for i, interface in enumerate(INTERFACE_ORDER):
+        vals = df[df["interface"] == interface][feature].astype(float)
+        bins = np.arange(lo, hi + 0.0000001, step)
+        counts, _, _ = ax[i].hist(
+            vals,
+            bins=bins,
+            color="gray",
             edgecolor="black",
-            zorder=len(data) - i + 1,
+            weights=np.ones_like(vals) / len(vals),
         )
-        # curve = pdf(xx)
-        # if fill:
-        #     ax.fill_between(
-        #         xx,
-        #         np.ones(n_points) * y,
-        #         curve + y,
-        #         zorder=len(data) - i + 1,
-        #         color=fill,
-        #     )
-        # ax.plot(xx, curve + y, c="k", zorder=len(data) - i + 1)
-        ax.axhline(y, c="black")
-        med = np.median(d)
-        mean = np.mean(d)
-        ax.plot((med, med), (y, yNext), color="red")
-        ax.plot((mean, mean), (y, yNext), color="blue")
-    if labels:
-        ax.set_yticks(ys, labels)
+
+        median = vals.median()
+        ax[i].axvline(x=median, c="#DD0000", lw=1.5, clip_on=False)
+        ax[i].scatter([median], [0], c="#DD0000", marker="^", clip_on=False)
+
+        mean = vals.mean()
+        ax[i].axvline(x=mean, c="#0000DD", lw=1.5, clip_on=False)
+        ax[i].scatter([mean], [0], c="#0000DD", marker="x", clip_on=False)
+
+        ax[i].set_xlim(lo, hi)
+        ax[i].set_xticks(bins)
+
+        ax[i].set_ylim(0, 1)
+        ax[i].set_yticks(yticks, labels=yticklabels)
+
+        ax[i].spines["top"].set_visible(False)
+        ax[i].spines["right"].set_visible(False)
+
+        ax[i].text(
+            -0.15,
+            0.5,
+            interface,
+            ha="right",
+            va="center",
+            fontweight="bold",
+            transform=ax[i].transAxes,
+        )
+
+    ax[-1].set_xlabel(r"$\bf{" + feature + r"}$", fontsize=10)
+    # ax[1].set_ylabel(r"$\bf Relative\ frequency$", fontsize=10)
+
+    fig.savefig(f"distribution-{feature}.pdf")
 
 
-res = []
-for i, g in correct.groupby("interface"):
-    res.append((INTERFACE_ORDER.index(i), i, g["taskTime"]))
+plot_hist(correct, "taskTime", 0, 90, 10)
+plot_hist(data, "correct", 0, 1, 0.2)
 
-res.sort(reverse=True)
-_, labels, d = zip(*res)
-fig, ax = plt.subplots(1, 1, figsize=(10, 7))
-ridgeline(ax, d, overlap=0.95, fill="gray", labels=labels)
-fig.tight_layout()
-ax.spines[["left", "right", "top"]].set_visible(False)
-plt.savefig("ridge.pdf")
+
+# %% Bootstrap feature estimators
+
+
+def bootstrap_forest(df, feature, estimator, lo, hi, step, spacing=0.5):
+    estimator_name = estimator.__name__
+
+    fig, ax = plt.subplots(1, 1, figsize=(8, 3))
+
+    coords = []
+    interfaces = []
+    lows = []
+    highs = []
+    estimates = []
+
+    for i, interface in enumerate(reversed(INTERFACE_ORDER)):
+        vals = df[df["interface"] == interface][feature].values
+        result = stats.bootstrap(
+            (vals,),
+            estimator,
+            n_resamples=99999,
+            confidence_level=0.95,
+            alternative="two-sided",
+            method="BCa",
+            random_state=0,
+        )
+        coords.append(i + spacing)
+        interfaces.append(interface)
+        lows.append(result.confidence_interval.low)
+        highs.append(result.confidence_interval.high)
+        estimates.append(estimator(vals))
+
+    df = pd.DataFrame(
+        {
+            "coord": coords,
+            "interface": interfaces,
+            "low": lows,
+            "high": highs,
+            "estimate": estimates,
+        }
+    )
+
+    ax.errorbar(
+        df["estimate"],
+        df["coord"],
+        xerr=[df["estimate"] - df["low"], df["high"] - df["estimate"]],
+        fmt="o",
+        color="black",
+    )
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    ax.set_xlim(lo, hi)
+    ax.set_xticks(np.arange(lo, hi + 0.0000001, step))
+    ax.set_xlabel(f"{estimator_name} {feature}", fontweight="bold")
+
+    ax.set_ylim(df["coord"].min() - spacing, df["coord"].max() + spacing)
+    ax.set_yticks(df["coord"], labels=df["interface"])
+
+    fig.tight_layout()
+    fig.savefig(f"forest-{feature}-{estimator_name}.pdf")
+
+
+bootstrap_forest(correct, "taskTime", np.median, 0, 90, 10)
+bootstrap_forest(data, "correct", np.mean, 0, 1, 0.2)
