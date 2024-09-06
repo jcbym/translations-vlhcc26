@@ -1,7 +1,4 @@
-pandas
 matplotlib
 numpy
-altair
-pyro-ppl
-arviz
+pandas
 scipy

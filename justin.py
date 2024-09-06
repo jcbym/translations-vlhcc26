@@ -1,4 +1,5 @@
 # %% Import
+utpu
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -23,7 +24,7 @@ INTERFACE_ORDER = [label for (_, label) in INTERFACES]
 # %% Load (wide) data
 
 wide = pd.read_csv(
-    "output.csv",
+    "data.csv",
     dtype=object,
     keep_default_na=False,
 )[
@@ -169,7 +170,7 @@ def plot_hist(df, feature, lo, hi, step):
     ax[-1].set_xlabel(r"$\bf{" + feature + r"}$", fontsize=10)
     # ax[1].set_ylabel(r"$\bf Relative\ frequency$", fontsize=10)
 
-    fig.savefig(f"distribution-{feature}.pdf")
+    fig.savefig(f"output/distribution-{feature}.pdf")
 
 
 plot_hist(correct, "taskTime", 0, 90, 10)
@@ -236,7 +237,7 @@ def bootstrap_forest(df, feature, estimator, lo, hi, step, spacing=0.5):
     ax.set_yticks(df["coord"], labels=df["interface"])
 
     fig.tight_layout()
-    fig.savefig(f"forest-{feature}-{estimator_name}.pdf")
+    fig.savefig(f"output/forest-{feature}-{estimator_name}.pdf")
 
 
 bootstrap_forest(correct, "taskTime", np.median, 0, 90, 10)
