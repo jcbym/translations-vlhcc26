@@ -6,17 +6,20 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 
+pd.set_option("future.no_silent_downcasting", True)
+
+# Color-blind-friendly color schemes: https://personal.sron.nl/~pault/
 
 # %% Define interfaces and order
 
 INTERFACES = [
-    ("control", "Unfamiliar Only", 0),
-    ("translation", "Translation", 0),
-    # "Probe–Mapping",
-    ("canonicalization", "Probe–Components", 1),
-    ("sequence", "Probe–Translation Steps", 1),
-    ("llmTranslation", "Probe–NL Translation Explanation", 1),
-    ("llmBasic", "NL Explanation", 2),
+    ("control", "Basic-Control", 0),
+    ("translation", "Basic-Translation", 0),
+    ("llmBasic", "Basic-NL", 0),
+    ("highlighting", "Pointed-Highlight", 1),
+    ("canonicalization", "Pointed-Individual", 1),
+    ("sequence", "Pointed-StepByStep", 1),
+    ("llmTranslation", "Pointed-Translation+NL", 1),
 ]
 
 INTERFACE_ORDER = [label for (_, label, _) in INTERFACES]
@@ -121,12 +124,14 @@ data = (
 
 def plot_hist(
     df,
+    *,
     feature,
     lo,
     hi,
     step,
-    *,
+    xlabel,
     correct_only,
+    xformatter=None,
 ):
     if correct_only:
         df = df[df["correct"]]
@@ -134,7 +139,7 @@ def plot_hist(
     fig, ax = plt.subplots(
         len(INTERFACE_ORDER),
         1,
-        figsize=(7, 6),
+        figsize=(7.5, 5.5),
         layout="constrained",
     )
     fig.get_layout_engine().set(hspace=0.05)
@@ -148,21 +153,56 @@ def plot_hist(
         counts, _, _ = ax[i].hist(
             vals,
             bins=bins,
-            color="gray",
-            edgecolor="black",
+            color="0.8",
+            edgecolor="0.6",
             weights=np.ones_like(vals) / len(vals),
         )
 
         median = vals.median()
-        ax[i].axvline(x=median, c="#DD0000", lw=1.5, clip_on=False)
-        ax[i].scatter([median], [0], c="#DD0000", marker="^", clip_on=False)
+        ax[i].axvline(
+            x=median,
+            c="#009988",
+            lw=2,
+            clip_on=False,
+            zorder=100,
+        )
+        ax[i].scatter(
+            [median],
+            [0],
+            c="#009988",
+            marker="^",
+            clip_on=False,
+            label="Median",
+            zorder=100,
+            s=50,
+        )
 
         mean = vals.mean()
-        ax[i].axvline(x=mean, c="#0000DD", lw=1.5, clip_on=False)
-        ax[i].scatter([mean], [0], c="#0000DD", marker="x", clip_on=False)
+        ax[i].axvline(
+            x=mean,
+            c="#CC3311",
+            lw=2,
+            clip_on=False,
+            zorder=100,
+        )
+        ax[i].scatter(
+            [mean],
+            [0],
+            c="#CC3311",
+            marker="x",
+            clip_on=False,
+            label="Mean",
+            zorder=100,
+            s=50,
+        )
+
+        if i == 0:
+            ax[i].legend(bbox_to_anchor=(1.05, 1.05))
 
         ax[i].set_xlim(lo, hi)
         ax[i].set_xticks(bins)
+        if xformatter:
+            ax[i].xaxis.set_major_formatter(xformatter)
 
         ax[i].set_ylim(0, 1)
         ax[i].set_yticks(yticks, labels=yticklabels)
@@ -180,21 +220,47 @@ def plot_hist(
             transform=ax[i].transAxes,
         )
 
-    ax[-1].set_xlabel(r"$\bf{" + feature + r"}$", fontsize=10)
-    # ax[1].set_ylabel(r"$\bf Relative\ frequency$", fontsize=10)
+    ax[-1].set_xlabel(
+        xlabel,
+        fontsize=10,
+        fontweight="bold",
+    )
 
-    fig.savefig(f"output/distribution-c{correct_only}-{feature}.pdf")
+    # ax[int((len(INTERFACES) - 1) / 2)].set_ylabel(
+    #     "Relative frequency",
+    #     fontsize=10,
+    #     fontweight="bold",
+    # )
+
+    fig.savefig(
+        f"output/distribution-c{correct_only}-{feature}.pdf",
+        bbox_inches="tight",
+    )
 
 
-plot_hist(data, "taskTime", 0, 90, 10, correct_only=True)
-plot_hist(data, "correct", 0, 1, 0.2, correct_only=False)
-plot_hist(data, "score", 0, 1, 0.2, correct_only=False)
+plot_hist(
+    data,
+    feature="taskTime",
+    lo=0,
+    hi=90,
+    step=10,
+    xlabel="Time taken",
+    correct_only=True,
+)
+
+plot_hist(
+    data,
+    feature="score",
+    lo=0,
+    hi=1,
+    step=0.25,
+    xlabel="Percent correct",
+    correct_only=False,
+    xformatter=ticker.PercentFormatter(xmax=1),
+)
 
 
 # %% Bootstrap feature estimators
-
-
-# Color-blind-friendly color schemes: https://personal.sron.nl/~pault/
 
 
 def bootstrap_forest(
@@ -238,20 +304,31 @@ def bootstrap_forest(
             coord += spacing
 
         vals = df[df["interface"] == interface][feature].values
-        result = stats.bootstrap(
-            (vals,),
-            estimator,
-            n_resamples=99999,
-            confidence_level=0.95,
-            alternative="two-sided",
-            method="BCa",
-            random_state=0,
-        )
+        estimate = estimator(vals)
+        if len(vals) == 1:
+            low = estimate
+            high = estimate
+            print(
+                f"WARNING: Only 1 sample for {interface} for file 'forest-c{correct_only}-{feature}-{estimator_name}.pdf'"
+            )
+        else:
+            result = stats.bootstrap(
+                (vals,),
+                estimator,
+                n_resamples=99999,
+                confidence_level=0.95,
+                alternative="two-sided",
+                method="BCa",
+                random_state=0,
+            )
+            low = result.confidence_interval.low
+            high = result.confidence_interval.high
+
         coords.append(coord)
         interfaces.append(interface)
-        lows.append(result.confidence_interval.low)
-        highs.append(result.confidence_interval.high)
-        estimates.append(estimator(vals))
+        lows.append(low)
+        highs.append(high)
+        estimates.append(estimate)
         colors.append(experiment_colors[experiment])
 
         coord += 1
@@ -336,7 +413,7 @@ bootstrap_forest(
     hi=60,
     step=10,
     correct_only=True,
-    xlabel=r"$\mathbf{Median\ time\ taken}\ \text{(min.)},\, \it{lower}\ \text{is\ better}$",
+    xlabel=r"$\mathbf{Median\ time\ taken}\ \text{(min.)},\, \it{lower}\ \text{is\ better}$, 95% bootstrap confidence interval",
     text_format={
         "hpad": 0.8,
         "formatter": lambda x: str(round(x, 1)),
@@ -351,7 +428,7 @@ bootstrap_forest(
     hi=1,
     step=0.1,
     correct_only=False,
-    xlabel=r"$\mathbf{Percent\ correct},\, \it{higher}\ \text{is\ better}$",
+    xlabel=r"$\mathbf{Success\ rate},\, \it{higher}\ \text{is\ better}$, 95% bootstrap confidence interval",
     xformatter=ticker.PercentFormatter(xmax=1),
     text_format={
         "hpad": 0.01,
