@@ -15,11 +15,11 @@ pd.set_option("future.no_silent_downcasting", True)
 INTERFACES = [
     ("control", "Basic-Control", 0),
     ("translation", "Basic-Translation", 0),
-    ("llmBasic", "Basic-NL", 0),
-    ("highlighting", "Pointed-Highlight", 1),
-    ("canonicalization", "Pointed-Individual", 1),
-    ("sequence", "Pointed-StepByStep", 1),
-    ("llmTranslation", "Pointed-Translation+NL", 1),
+    ("llmBasic", "Basic-NL", 1),
+    ("highlighting", "Pointed-Highlight", 2),
+    ("canonicalization", "Pointed-Individual", 2),
+    ("sequence", "Pointed-StepByStep", 2),
+    ("llmTranslation", "Pointed-Translation+NL", 2),
 ]
 
 INTERFACE_ORDER = [label for (_, label, _) in INTERFACES]
@@ -70,23 +70,30 @@ for c in [
 ]:
     wide[c] = (wide[c].astype(float) / 1000) / 60
 
-# Treat "skipped" as incorrect
 for c in [
     "correct1",
     "correct2",
     "correct3",
 ]:
-    wide[c] = (
-        wide[c]
-        .replace(
-            {
-                "": False,
-                "FALSE": False,
-                "TRUE": True,
-            }
-        )
-        .astype(bool)
-    )
+    vals = wide[c]
+
+    # Treat "skipped" as incorrect (put "skipped" in new column)
+    wide[c] = vals.replace(
+        {
+            "": False,
+            "FALSE": False,
+            "TRUE": True,
+        }
+    ).astype(bool)
+
+    skip_c = f"skipped{c[-1]}"
+    wide[skip_c] = vals.replace(
+        {
+            "": True,
+            "FALSE": False,
+            "TRUE": False,
+        }
+    ).astype(bool)
 
 wide
 
@@ -94,12 +101,12 @@ wide
 
 long = pd.wide_to_long(
     wide,
-    ["timesRan", "timesUsed", "taskTime", "correct"],
+    ["timesRan", "timesUsed", "taskTime", "correct", "skipped"],
     i=["userID", "interface"],
     j="task",
 ).reset_index()
 
-long["score"] = long["correct"].astype(float) / 3
+long["success_rate"] = long["correct"].astype(float) / 3
 
 long
 
@@ -113,7 +120,7 @@ data = (
             "timesUsed": "sum",
             "taskTime": "sum",
             "correct": "all",
-            "score": "sum",
+            "success_rate": "sum",
         }
     )
     .reset_index()
@@ -136,10 +143,25 @@ def plot_hist(
     if correct_only:
         df = df[df["correct"]]
 
+    too_low = df[feature] < lo
+    too_high = df[feature] > hi
+
+    if too_low.sum() > 0:
+        print(
+            f"WARNING: {too_low.sum()} too low for distribution-c{correct_only}-{feature}.pdf"
+        )
+        print(df[too_low])
+
+    if too_high.sum() > 0:
+        print(
+            f"WARNING: {too_high.sum()} too high for distribution-c{correct_only}-{feature}.pdf"
+        )
+        print(df[too_high])
+
     fig, ax = plt.subplots(
         len(INTERFACE_ORDER),
         1,
-        figsize=(7.5, 5.5),
+        figsize=(8, 6),
         layout="constrained",
     )
     fig.get_layout_engine().set(hspace=0.05)
@@ -149,14 +171,33 @@ def plot_hist(
 
     for i, interface in enumerate(INTERFACE_ORDER):
         vals = df[df["interface"] == interface][feature].astype(float)
-        bins = np.arange(lo, hi + 0.0000001, step)
-        counts, _, _ = ax[i].hist(
-            vals,
-            bins=bins,
-            color="0.8",
-            edgecolor="0.6",
-            weights=np.ones_like(vals) / len(vals),
-        )
+
+        if step:  # continuous
+            bins = np.arange(lo, hi + 0.0000001, step)
+            ax[i].hist(
+                vals,
+                bins=bins,
+                color="0.8",
+                edgecolor="0.6",
+                weights=np.ones_like(vals) / len(vals),
+            )
+            ax[i].set_xlim(lo, hi)
+            ax[i].set_xticks(bins)
+        else:  # discrete
+            xs, counts = np.unique(
+                data["success_rate"].values,
+                return_counts=True,
+            )
+            spacing = 0.2
+            ax[i].bar(
+                xs,
+                counts / counts.sum(),
+                color="0.8",
+                edgecolor="0.6",
+                width=spacing,
+            )
+            ax[i].set_xlim(lo - spacing, hi + spacing)
+            ax[i].set_xticks(xs)
 
         median = vals.median()
         ax[i].axvline(
@@ -199,8 +240,6 @@ def plot_hist(
         if i == 0:
             ax[i].legend(bbox_to_anchor=(1.05, 1.05))
 
-        ax[i].set_xlim(lo, hi)
-        ax[i].set_xticks(bins)
         if xformatter:
             ax[i].xaxis.set_major_formatter(xformatter)
 
@@ -221,9 +260,8 @@ def plot_hist(
         )
 
     ax[-1].set_xlabel(
-        xlabel,
+        xlabel + " – " + ("continuous" if step else "discrete") + " data",
         fontsize=10,
-        fontweight="bold",
     )
 
     # ax[int((len(INTERFACES) - 1) / 2)].set_ylabel(
@@ -244,21 +282,20 @@ plot_hist(
     lo=0,
     hi=90,
     step=10,
-    xlabel="Time taken",
+    xlabel=r"$\mathbf{Time\ taken}$ (in minutes)",
     correct_only=True,
 )
 
 plot_hist(
     data,
-    feature="score",
+    feature="success_rate",
     lo=0,
     hi=1,
-    step=0.25,
-    xlabel="Percent correct",
+    step=None,
+    xlabel=r"$\mathbf{Success\ rate}$",
     correct_only=False,
     xformatter=ticker.PercentFormatter(xmax=1),
 )
-
 
 # %% Bootstrap feature estimators
 
@@ -272,11 +309,12 @@ def bootstrap_forest(
     hi,
     step,
     correct_only,
-    spacing=0.5,
+    spacing=1.5,
+    padding=0.5,
     experiment_colors={
         0: "#004488",
-        1: "#BB5566",
-        2: "#DDAA33",
+        1: "#6699CC",
+        2: "#994455",
     },
     xlabel=None,
     xformatter=None,
@@ -287,7 +325,7 @@ def bootstrap_forest(
 
     estimator_name = estimator.__name__
 
-    fig, ax = plt.subplots(1, 1, figsize=(8, 3))
+    fig, ax = plt.subplots(1, 1, figsize=(8, 3.5))
 
     coords = []
     interfaces = []
@@ -301,7 +339,7 @@ def bootstrap_forest(
     for interface in reversed(INTERFACE_ORDER):
         experiment = EXPERIMENTS[interface]
         if experiment != prev_experiment:
-            coord += spacing
+            coord += padding
 
         vals = df[df["interface"] == interface][feature].values
         estimate = estimator(vals)
@@ -318,7 +356,7 @@ def bootstrap_forest(
                 n_resamples=99999,
                 confidence_level=0.95,
                 alternative="two-sided",
-                method="BCa",
+                method="percentile",
                 random_state=0,
             )
             low = result.confidence_interval.low
@@ -331,7 +369,7 @@ def bootstrap_forest(
         estimates.append(estimate)
         colors.append(experiment_colors[experiment])
 
-        coord += 1
+        coord += spacing
         prev_experiment = experiment
 
     df = pd.DataFrame(
@@ -396,7 +434,7 @@ def bootstrap_forest(
         ax.xaxis.set_major_formatter(xformatter)
     ax.set_xlabel(xlabel if xlabel else f"$\\mathbf{{{estimator_name}\\ {feature}}}$")
 
-    ax.set_ylim(df["coord"].min() - spacing, df["coord"].max() + spacing)
+    ax.set_ylim(df["coord"].min() - padding, df["coord"].max() + padding)
     ax.set_yticks(df["coord"], labels=df["interface"])
     for t in ax.yaxis.get_ticklabels():
         t.set_color(experiment_colors[EXPERIMENTS[t.get_text()]])
@@ -413,7 +451,7 @@ bootstrap_forest(
     hi=60,
     step=10,
     correct_only=True,
-    xlabel=r"$\mathbf{Median\ time\ taken}\ \text{(min.)},\, \it{lower}\ \text{is\ better}$, 95% bootstrap confidence interval",
+    xlabel=r"$\mathbf{Median\ time\ taken}$ (in minutes) among successful participants",
     text_format={
         "hpad": 0.8,
         "formatter": lambda x: str(round(x, 1)),
@@ -422,13 +460,13 @@ bootstrap_forest(
 
 bootstrap_forest(
     data,
-    feature="score",
+    feature="success_rate",
     estimator=np.mean,
     lo=0,
     hi=1,
     step=0.1,
     correct_only=False,
-    xlabel=r"$\mathbf{Success\ rate},\, \it{higher}\ \text{is\ better}$, 95% bootstrap confidence interval",
+    xlabel=r"$\mathbf{Mean\ success\ rate}$ among all participants",
     xformatter=ticker.PercentFormatter(xmax=1),
     text_format={
         "hpad": 0.01,
