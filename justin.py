@@ -282,7 +282,7 @@ plot_hist(
     lo=0,
     hi=90,
     step=10,
-    xlabel=r"$\mathbf{Time\ taken}$ (in minutes)",
+    xlabel=r"$\mathbf{Time\ taken}$ (in minutes) among successful participants",
     correct_only=True,
 )
 
@@ -292,7 +292,7 @@ plot_hist(
     lo=0,
     hi=1,
     step=None,
-    xlabel=r"$\mathbf{Success\ rate}$",
+    xlabel=r"$\mathbf{Success\ rate}$ among all participants",
     correct_only=False,
     xformatter=ticker.PercentFormatter(xmax=1),
 )
