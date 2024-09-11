@@ -501,7 +501,10 @@ pdata["exp"] = pdata["exp"].astype(int)
 alt.Chart(pdata).mark_boxplot().encode(
     alt.X("exp:Q"),
     alt.Y("taskTime:Q"),
-).save("output/exp-taskTime.html")
+    alt.Row("interface:N"),
+).save(
+    "output/exp-taskTime.html",
+)
 
 alt.layer(
     alt.Chart()
@@ -520,4 +523,8 @@ alt.layer(
         alt.Y("mean(success_rate):Q"),
     ),
     data=pdata,
-).save("output/exp-success_rate.html")
+).facet(
+    row="interface",
+).save(
+    "output/exp-success_rate.html",
+)
