@@ -473,3 +473,51 @@ bootstrap_forest(
         "formatter": lambda x: str(int(round(x, 2) * 100)) + "%",
     },
 )
+
+# %% Look at participant information
+
+import altair as alt
+
+participants = pd.read_csv(
+    "participants.csv",
+    dtype=object,
+)[["id", "exp"]]
+
+# x = set(data["userID"])
+# y = set(participants["id"])
+# assert len(x - y) == 0
+# assert len(y - x) == 0
+# assert sorted(data["userID"]) == sorted(participants["id"])
+
+pdata = pd.merge(
+    data,
+    participants,
+    left_on="userID",
+    right_on="id",
+)
+
+pdata["exp"] = pdata["exp"].astype(int)
+
+alt.Chart(pdata).mark_boxplot().encode(
+    alt.X("exp:Q"),
+    alt.Y("taskTime:Q"),
+).save("output/exp-taskTime.html")
+
+alt.layer(
+    alt.Chart()
+    .mark_errorbar(extent="ci")
+    .encode(
+        alt.X("exp:Q"),
+        alt.Y("success_rate:Q"),
+    ),
+    alt.Chart()
+    .mark_point(
+        filled=True,
+        color="black",
+    )
+    .encode(
+        alt.X("exp:Q"),
+        alt.Y("mean(success_rate):Q"),
+    ),
+    data=pdata,
+).save("output/exp-success_rate.html")

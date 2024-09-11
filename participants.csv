@@ -1,0 +1,98 @@
+id,start time,conducted by,group,exp,recruiting source
+1,,Jacob,control,6,other
+5,,Jacob,control,6,other
+7,,Jacob,control,6,other
+9,,Jacob,control,4,other
+11,,Jacob,control,6,other
+13,,Jacob,control,6,other
+16,,Jacob,control,9,other
+20,,Jacob,control,6,other
+22,,Jacob,llmbasic,5,other
+23,,Jacob,llmbasic,5,other
+24,,Jacob,llmbasic,8,other
+25,,Jacob,llmbasic,3,other
+26,,Jacob,llmbasic,5,other
+28,,Jacob,llmbasic,5,other
+29,,Jacob,llmbasic,7,other
+30,,Jacob,llmbasic,6,other
+31,,Jacob,llmbasic,7,other
+43,,Jacob,control,8,xlab
+44,,Jacob,control,6,xlab
+45,,Jacob,control,8,xlab
+47,,Jacob,llmbasic,8,xlab
+49,,Jacob,llmbasic,6,xlab
+53,,Jacob,translation,8,xlab
+54,,Jacob,translation,7,xlab
+55,,Jacob,translation,9,xlab
+56,,Jacob,translation,7,xlab
+57,,Jacob,translation,2,xlab
+58,,Jacob,translation,6,xlab
+59,,Jacob,translation,9,xlab
+60,,Jacob,translation,8,xlab
+61,,Jacob,translation,8,xlab
+62,,Jacob,translation,7,xlab
+64,,Jacob,llmtranslation,4,xlab
+65,,Jacob,llmtranslation,5,xlab
+66,,Jacob,llmtranslation,5,xlab
+67,,Jacob,llmtranslation,3,xlab
+68,,Jacob,llmtranslation,9,xlab
+69,,Jacob,llmbasic,6,xlab
+70,,Jacob,control,4,xlab
+71,,Jacob,llmbasic,4,xlab
+73,,Jacob,llmbasic,6,xlab
+74,,Jacob,llmtranslation,8,xlab
+75,,Jacob,llmtranslation,3,xlab
+76,,Jacob,llmtranslation,9,xlab
+77,,Jacob,llmtranslation,8,xlab
+78,,Jacob,llmtranslation,8,xlab
+79,,Jacob,llmtranslation,5,xlab
+80,,Laila,llmtranslation,5,xlab
+81,,Jacob,translation,8,xlab
+82,,Jacob,translation,3,xlab
+83,8/18/2024 12:00 PM,Jacob,llmtranslation,5,other
+84,8/18/2024 3:00 PM,Laila,translation,3,other
+85,8/19/2024 9:00 AM,Jacob,llmtranslation,5,other
+86,8/20/24 10:30 AM,Laila,control,8,other
+87,8/20/24 1:30 PM,Jacob,control,7,other
+88,8/22/2024 10:30 AM,Jacob,translation,7,xlab
+89,8/23/2024 12:00 PM,Jacob,canonicalization,8,other
+90,8/23/2024 3:00 PM,Jacob,canonicalization,6,other
+91,8/25/2024 9:00 AM,Jacob,canonicalization,6,other
+92,8/25/2024 12:00 PM,Jacob,canonicalization,8,other
+93,8/27/2024 9:00 AM,Laila,canonicalization,8,other
+94,8/27/2024 10:30 AM,Jacob,canonicalization,4,xlab
+95,8/27/2024 3:00 PM,Jacob,canonicalization,8,other
+96,8/27/2024 4:30 PM,Jacob,canonicalization,7,other
+97,8/28/2024 10:30 AM,Jacob,canonicalization,7,other
+98,8/28/2024 12:00 PM,Jacob,canonicalization,7,xlab
+99,8/28/2024 6:00 PM,Jacob,canonicalization,5,other
+100,8/29/2024 7:30 PM,Jacob,canonicalization,5,other
+101,8/30/2024 9:00 AM,Laila,canonicalization,3,other
+102,8/30/2024 10:30 AM,Jacob,sequence,6,other
+103,8/30/2024 1:30 PM,Jacob,sequence,3,other
+104,8/30/2024 4:30 PM,Jacob,sequence,7,other
+105,8/31/2024 9:00 AM,Jacob,sequence,8,other
+106,8/31/2024 10:30 AM,Jacob,sequence,7,xlab
+107,8/31/2024 12:00 PM,Laila,sequence,6,other
+108,9/1/2024 12:00 PM,Jacob,sequence,5,xlab
+109,9/2/2024 1:30 PM,Jacob,sequence,5,other
+110,9/3/2024 9:00 AM,Laila,sequence,8,other
+111,9/3/2024 1:30 PM,Jacob,sequence,5,other
+112,9/3/2024 3:00 PM,Laila,sequence,8,other
+113,9/3/2024 6:00 PM,Jacob,sequence,7,other
+114,9/3/2024 7:30 PM,Jacob,sequence,6,other
+115,9/4/2024 9:00 AM,Jacob,sequence,7,xlab
+117,9/5/2024 7:30 PM,Jacob,canonicalization,4,other
+118,9/6/2024 6:00 PM,Jacob,highlighting,3,other
+119,9/6/2024 7:30 PM,Jacob,highlighting,6,other
+120,9/7/2024 9:00 AM,Jacob,highlighting,6,xlab
+121,9/7/2024 12:00 PM,Jacob,highlighting,3,other
+122,9/7/2024 1:30 PM,Jacob,highlighting,8,other
+123,9/7/2024 7:30 PM,Jacob,highlighting,9,other
+124,9/8/2024 12:00 PM,Jacob,highlighting,5,other
+125,9/9/2024 12:00 PM,Jacob,highlighting,7,other
+126,9/10/2024 9:00 AM,Jacob,highlighting,4,other
+127,9/10/2024 10:30 AM,Jacob,highlighting,5,xlab
+128,9/10/2024 1:30 PM,Jacob,highlighting,7,other
+129,9/10/2024 3:00 PM,Jacob,highlighting,7,xlab
+130,9/10/2024 6:00 PM,Jacob,highlighting,5,other
