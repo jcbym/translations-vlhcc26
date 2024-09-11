@@ -2522,33 +2522,6 @@ for i in range(len(x)):
    if i % 2 == 0:
      mins.append(tf.math.reduce_min(x[i]))
 print(tf.math.reduce_max(mins))",FALSE,1507275,485476,1403137,,TRUE,FALSE
-116,1.72557E+12,canonicalization,where,convolve,minmax,1.72557E+12,1.72558E+12,1.72558E+12,1.72558E+12,1.72558E+12,1.72558E+12,1,7,2,7,14,10,answered,answered,answered,"x = tf.constant([5, 2, 20, 15, 32, 100])
-new_x = tf.where(
-  tf.boolean_mask(x, x % 5 == 0) % 10 != 0,
-  tf.square(tf.boolean_mask(x, x % 5 == 0)),
-  tf.boolean_mask(x, x % 5 == 0)
-)
-print(new_x)","x = tf.constant([4, 12, 8, 8])
-new_x = tf.squeeze(
-  tf.nn.conv1d(
-    tf.reshape(x, [1, int(x.shape[0]), 1]),
-    tf.constant([[[2]], [[1]]]),
-    1,
-    'VALID'
-  )
-)
-print(new_x)","x = tf.constant(
-  [[1, 2, 3],
-  [101, 102, 103],
-  [11, 12, 13]]
-)
-new_x = tf.math.reduce_max(
-  tf.math.reduce_min(
-    tf.boolean_mask(x, tf.range(len(x)) % 2 == 0),
-    axis=1
-  )
-)
-print(new_x)",FALSE,273084,592365,296829,TRUE,TRUE,TRUE
 117,1.72559E+12,canonicalization,where,convolve,minmax,1.72559E+12,1.72559E+12,1.72559E+12,1.72559E+12,1.72559E+12,1.72559E+12,34,21,27,12,10,15,skipped,answered,answered,"x = tf.constant([5, 2, 20, 15, 32, 100])
 
 x_only_5 = tf.boolean_mask(x, x % 5 == 0)
@@ -2742,3 +2715,288 @@ new_x = tf.math.reduce_max(
   )
 )
 print(new_x)",FALSE,2327384,907492,514532,FALSE,TRUE,TRUE
+123,1.72576E+12,highlighting,where,convolve,minmax,1.72576E+12,1.72576E+12,1.72576E+12,1.72576E+12,1.72576E+12,1.72576E+12,4,23,15,7,3,0,answered,answered,answered,"x = tf.constant([5, 2, 20, 15, 32, 100])
+new_x = tf.where(
+  tf.boolean_mask(x, x % 5 == 0) % 10 != 0,
+  tf.square(tf.boolean_mask(x, x % 5 == 0)),
+  tf.boolean_mask(x, x % 5 == 0)
+)
+print(new_x)","x = tf.constant([4, 12, 8, 8])
+new_x = tf.squeeze(
+  tf.nn.conv1d(
+    tf.reshape(x, [1, int(x.shape[0]), 1]),
+    tf.constant([[[0]], [[2]], [[1]]]),
+    1,
+    'SAME'
+  )
+)[:-1]
+print(new_x)","x = tf.constant(
+  [[1, 2, 3],
+  [101, 102, 103],
+  [11, 12, 13]]
+)
+new_x = tf.math.reduce_max(
+  tf.math.reduce_min(
+    tf.boolean_mask(x, tf.range(len(x)) % 2 == 0),
+    axis=1
+  )
+)
+print(new_x)",FALSE,465607,599815,281678,TRUE,TRUE,TRUE
+124,1.72582E+12,highlighting,where,convolve,minmax,1.72582E+12,1.72582E+12,1.72582E+12,1.72582E+12,1.72582E+12,1.72582E+12,10,2,5,3,2,4,answered,answered,answered,"x = tf.constant([5, 2, 20, 15, 32, 100])
+new_x = tf.where(
+  tf.boolean_mask(x, x % 5 == 0) % 10 == 0,
+  tf.square(tf.boolean_mask(x, x % 5 == 0)),
+  tf.boolean_mask(x, x % 5 == 0)
+)
+print(new_x)","x = tf.constant([4, 12, 8, 8])
+new_x = tf.squeeze(
+  tf.nn.conv1d(
+    tf.reshape(x, [1, int(x.shape[0]), 1]),
+    tf.constant([[[2]], [[1]]]),
+    1,
+    'VALID'
+  )
+)
+print(new_x)","x = tf.constant(
+  [[1, 2, 3],
+  [101, 102, 103],
+  [11, 12, 13]]
+)
+new_x = tf.math.reduce_max(
+  tf.math.reduce_min(
+    tf.boolean_mask(x, tf.range(len(x)) % 2 == 0),
+    axis=1
+  )
+)
+print(new_x)",FALSE,515870,188962,160215,FALSE,TRUE,TRUE
+125,1.72591E+12,highlighting,where,convolve,minmax,1.72591E+12,1.72591E+12,1.72591E+12,1.72591E+12,1.72591E+12,1.72591E+12,25,15,24,17,17,23,answered,answered,answered,"x = tf.constant([5, 2, 20, 15, 32, 100])
+new_x = tf.where(
+  ((tf.boolean_mask(x, ((x % 5) == 0)) % 10) == 5),
+  tf.square(tf.boolean_mask(x, ((x % 5) == 0))),
+  tf.boolean_mask(x, ((x % 5) == 0))
+)
+print(new_x)","x = tf.constant([4, 12, 8, 8])
+new_x = tf.squeeze(
+  tf.nn.conv1d(
+    tf.reshape(x, [1, int(x.shape[0]), 1]),
+    tf.constant([[[2]], [[1]]]),
+    1,
+    'VALID'
+  )
+)
+print(new_x)","x = tf.constant(
+  [[1, 2, 3],
+  [101, 102, 103],
+  [11, 12, 13]]
+)
+new_x = tf.math.reduce_max(
+  tf.math.reduce_min(
+    tf.boolean_mask(x, tf.range(len(x)) % 2 == 0),
+    axis=1
+  )
+)
+print(new_x)",FALSE,2102372,961575,1096510,TRUE,TRUE,TRUE
+126,1.72598E+12,highlighting,where,convolve,minmax,1.72599E+12,1.72599E+12,1.72599E+12,1.72599E+12,1.72599E+12,1.72599E+12,17,1,11,1,9,0,answered,skipped,answered,"x = tf.constant([5, 2, 20, 15, 32, 100])
+new_x = tf.where((x % 5 == 0) & (x % 10 != 0), tf.square(x), x
+)
+new_x = tf.boolean_mask(new_x, x % 5 == 0)
+print(new_x)","x = tf.constant([4, 12, 8, 8])
+new_x = tf.squeeze(
+  tf.nn.conv1d(
+    tf.reshape(x, [1, int(x.shape[0]), 1]),
+    tf.constant([[[1]], [[1]], [[1]]]),
+    1,
+    'VALID'
+  )
+)
+print(new_x)","x = tf.constant(
+  [[1, 2, 3],
+  [101, 102, 103],
+  [11, 12, 13]]
+)
+new_x = tf.math.reduce_max(
+  tf.math.reduce_min(
+    tf.boolean_mask(x, tf.range(len(x)) % 2 == 0),
+    axis=1
+  )
+)
+print(new_x)",FALSE,712705,432892,356081,TRUE,,TRUE
+127,1.72599E+12,highlighting,where,convolve,minmax,1.72599E+12,1.72599E+12,1.72599E+12,1.72599E+12,1.72599E+12,1.72599E+12,3,86,9,1,18,8,answered,skipped,answered,"x = tf.constant([5, 2, 20, 15, 32, 100])
+new_x = tf.where(
+  tf.boolean_mask(x, x % 5 == 0) % 10 == 0,
+  tf.boolean_mask(x, x % 5 == 0),
+  tf.square(tf.boolean_mask(x, x % 5 == 0))
+  
+)
+print(new_x)","x = tf.constant([4, 12, 8, 8])
+new_x = tf.squeeze(
+  tf.nn.conv1d(
+    tf.reshape(x, [1, int(x.shape[0]), 1]),
+    tf.constant([[[1]], [[2]]]),
+    1,
+    'VALID'
+  )
+)
+print(new_x)
+
+","x = tf.constant(
+  [[1, 2, 3],
+  [101, 102, 103],
+  [11, 12, 13]]
+)
+new_x = tf.math.reduce_max(
+  tf.math.reduce_min(
+    tf.boolean_mask(x, tf.range(len(x)) % 2 == 0),
+    axis=1
+  )
+)
+print(new_x)",FALSE,416119,2467103,296151,TRUE,,TRUE
+128,1.726E+12,highlighting,where,convolve,minmax,1.726E+12,1.726E+12,1.726E+12,1.726E+12,1.726E+12,1.726E+12,9,7,11,6,10,7,answered,answered,answered,"x = tf.constant([5, 2, 20, 15, 32, 100])
+new_x = tf.where(
+  tf.boolean_mask(x, x % 5 == 0) % 10 != 0,
+  tf.square(tf.boolean_mask(x, x % 10 != 0)),
+  tf.boolean_mask(x, x % 5 == 0)
+)
+print(new_x)","x = tf.constant([4, 12, 8, 8])
+new_x = tf.squeeze(
+  tf.nn.conv1d(
+    tf.reshape(x, [1, int(x.shape[0]), 1]),
+    tf.constant([[[2]], [[1]]]),
+    1,
+    'VALID'
+  )
+)
+print(new_x)","x = tf.constant(
+  [[1, 2, 3],
+  [101, 102, 103],
+  [11, 12, 13]]
+)
+new_x = tf.math.reduce_max(
+  tf.math.reduce_min(
+    tf.boolean_mask(x, tf.range(len(x)) % 2 == 0),
+    axis=1
+  )
+)
+print(new_x)",FALSE,532161,332826,296489,FALSE,TRUE,TRUE
+129,1.72601E+12,highlighting,where,convolve,minmax,1.72601E+12,1.72601E+12,1.72601E+12,1.72601E+12,1.72601E+12,1.72601E+12,10,19,15,18,33,24,answered,answered,answered,"x = tf.constant([5, 2, 20, 15, 32, 100])
+new_x = tf.where(
+  tf.boolean_mask(x, x % 5 == 0) % 10 != 0,
+  tf.square(tf.boolean_mask(x, x % 5 == 0)),
+  tf.boolean_mask(x, x % 5 == 0)
+)
+print(new_x)","x = tf.constant([4, 12, 8, 8])
+new_x = tf.squeeze(
+  tf.nn.conv1d(
+    tf.reshape(x, [1, int(x.shape[0]), 1]),
+    tf.constant([[[2]], [[1]]]),
+    1,
+    'VALID'
+  )
+)
+print(new_x)","x = tf.constant(
+  [[1, 2, 3],
+  [101, 102, 103],
+  [11, 12, 13]]
+)
+new_x = tf.math.reduce_max(
+  tf.math.reduce_min(
+    tf.boolean_mask(x, tf.range(len(x)) % 2 == 0),
+    axis=1
+  )
+)
+print(new_x)",FALSE,607118,670666,513087,TRUE,TRUE,TRUE
+130,1.72602E+12,highlighting,where,convolve,minmax,1.72602E+12,1.72602E+12,1.72602E+12,1.72602E+12,1.72602E+12,1.72602E+12,43,26,7,9,11,8,skipped,answered,answered,"x = tf.constant([5, 2, 20, 15, 32, 100])
+new_x = tf.where(
+  tf.boolean_mask(x, x % 5 == 0) % 10 == 0,     # 1. divisible by both 5 and 10
+  tf.square(tf.boolean_mask(x, x % 5 == 0) % 10 > 0),   # 2. divisible by 5 
+  tf.boolean_mask(x, x % 5 == 0    #3.         
+))
+print(new_x)
+
+## mask = dr
+
+
+
+
+##x = tf.constant([5, 2, 20, 15, 32, 100])
+##new_x = tf.where(
+##  tf.boolean_mask(x, x % 5 == 0) % 10 == 0,     # 1. divisible by both 5 and 10
+##  tf.square(tf.boolean_mask(x, x % 5 == 0)),   # 2. divisible by 5 
+##  tf.boolean_mask(x, x % 5 == 0    #3.         
+##))
+##print(new_x)
+
+
+
+[5, 400, 15, 10000]","
+
+
+
+x = tf.constant([4, 12, 8, 8])
+new_x = tf.squeeze(
+  tf.nn.conv1d(
+    tf.reshape(x, [1, int(x.shape[0]), 1]),
+    tf.constant([[[2]], [[1]]]),
+    1,
+    'VALID'
+  )
+)
+print(new_x)
+
+## [24, 28] 
+
+## >>> 2x[0] + x[1]  ,  2x[1] + x[2], .....  
+
+## squeeze - removes vals with given cond
+##  nn.conv1d - 
+
+
+[1, 4, 1]
+","x = tf.constant(
+  [[1, 2, 3],
+  [101, 102, 103],
+  [11, 12, 13]]
+)
+new_x = tf.math.reduce_max(
+  tf.math.reduce_min(
+    tf.boolean_mask(x, tf.range(len(x)) % 2 == 0),
+    axis=1
+  )
+)
+print(new_x)",FALSE,1600045,1150665,454728,,TRUE,TRUE
+131,1.72608E+12,highlighting,where,convolve,minmax,1.72608E+12,1.72608E+12,1.72608E+12,1.72608E+12,1.72608E+12,1.72608E+12,2,5,3,3,2,10,answered,answered,answered,"x = tf.constant([5, 2, 20, 15, 32, 100])
+new_x = tf.where(
+  tf.boolean_mask(x, x % 5 == 0) % 10 != 0,
+  tf.square(tf.boolean_mask(x, x % 5 == 0)),
+  tf.boolean_mask(x, x % 5 == 0)
+)
+print(new_x)","x = tf.constant([4, 12, 8, 8])
+new_x = tf.squeeze(
+  tf.nn.conv1d(
+    tf.reshape(x, [1, int(x.shape[0]), 1]),
+    tf.constant([[[2]], [[1]]]),
+    1,
+    'VALID'
+  )
+)
+print(new_x)
+
+# new_x = tf.squeeze(
+#  tf.nn.conv1d(
+#    tf.reshape(x, [1, int(x.shape[0]), 1]),
+#    tf.constant([[[1]], [[1]], [[1]]]),
+#    1,
+#    'VALID'
+#  )
+#)","x = tf.constant(
+  [[1, 2, 3],
+  [101, 102, 103],
+  [11, 12, 13]]
+)
+new_x = tf.math.reduce_max(
+  tf.math.reduce_min(
+    tf.boolean_mask(x, tf.range(len(x)) % 2 == 0),
+    axis=1
+  )
+)
+print(new_x)",FALSE,420329,647976,447481,TRUE,TRUE,TRUE

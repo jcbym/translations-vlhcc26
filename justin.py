@@ -137,6 +137,7 @@ def plot_hist(
     hi,
     step,
     xlabel,
+    large,
     correct_only,
     xformatter=None,
 ):
@@ -166,8 +167,12 @@ def plot_hist(
     )
     fig.get_layout_engine().set(hspace=0.05)
 
-    yticks = [0, 0.25, 0.5, 0.75, 1]
-    yticklabels = ["0%", "", "50%", "", "100%"]
+    if large:
+        yticks = [0, 2, 4, 6, 8, 10, 12]
+        yticklabels = ["0", "", "4", "", "8", "", "12"]
+    else:
+        yticks = [0, 1, 2, 3, 4]
+        yticklabels = ["0", "", "2", "", "4"]
 
     for i, interface in enumerate(INTERFACE_ORDER):
         vals = df[df["interface"] == interface][feature].astype(float)
@@ -179,25 +184,24 @@ def plot_hist(
                 bins=bins,
                 color="0.8",
                 edgecolor="0.6",
-                weights=np.ones_like(vals) / len(vals),
             )
             ax[i].set_xlim(lo, hi)
             ax[i].set_xticks(bins)
         else:  # discrete
             xs, counts = np.unique(
-                data["success_rate"].values,
+                vals,
                 return_counts=True,
             )
             spacing = 0.2
             ax[i].bar(
                 xs,
-                counts / counts.sum(),
+                counts,
                 color="0.8",
                 edgecolor="0.6",
                 width=spacing,
             )
-            ax[i].set_xlim(lo - spacing, hi + spacing)
-            ax[i].set_xticks(xs)
+            ax[i].set_xlim(-spacing, 1 + spacing)
+            ax[i].set_xticks([0, 0.333, 0.667, 1])
 
         median = vals.median()
         ax[i].axvline(
@@ -284,6 +288,7 @@ plot_hist(
     step=10,
     xlabel=r"$\mathbf{Time\ taken}$ (in minutes) among successful participants",
     correct_only=True,
+    large=False,
 )
 
 plot_hist(
@@ -295,6 +300,7 @@ plot_hist(
     xlabel=r"$\mathbf{Success\ rate}$ among all participants",
     correct_only=False,
     xformatter=ticker.PercentFormatter(xmax=1),
+    large=True,
 )
 
 # %% Bootstrap feature estimators
@@ -448,7 +454,7 @@ bootstrap_forest(
     feature="taskTime",
     estimator=np.median,
     lo=0,
-    hi=60,
+    hi=70,
     step=10,
     correct_only=True,
     xlabel=r"$\mathbf{Median\ time\ taken}$ (in minutes) among successful participants",
@@ -483,11 +489,7 @@ participants = pd.read_csv(
     dtype=object,
 )[["id", "exp"]]
 
-# x = set(data["userID"])
-# y = set(participants["id"])
-# assert len(x - y) == 0
-# assert len(y - x) == 0
-# assert sorted(data["userID"]) == sorted(participants["id"])
+assert sorted(data["userID"]) == sorted(participants["id"])
 
 pdata = pd.merge(
     data,
@@ -501,7 +503,6 @@ pdata["exp"] = pdata["exp"].astype(int)
 alt.Chart(pdata).mark_boxplot().encode(
     alt.X("exp:Q"),
     alt.Y("taskTime:Q"),
-    alt.Row("interface:N"),
 ).save(
     "output/exp-taskTime.html",
 )
@@ -523,8 +524,6 @@ alt.layer(
         alt.Y("mean(success_rate):Q"),
     ),
     data=pdata,
-).facet(
-    row="interface",
 ).save(
     "output/exp-success_rate.html",
 )
