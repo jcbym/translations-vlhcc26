@@ -260,7 +260,7 @@ def plot_hist(
         )
 
     ax[-1].set_xlabel(
-        xlabel + " – " + ("continuous" if step else "discrete") + " data",
+        xlabel,  #  + " – " + ("continuous" if step else "discrete") + " data",
         fontsize=10,
     )
 
