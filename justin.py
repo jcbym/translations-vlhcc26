@@ -140,6 +140,8 @@ def plot_hist(
     large,
     correct_only,
     xformatter=None,
+    xticks=None, # must be set if step is None
+    spacing=0.2, # only applies if step is None
 ):
     if correct_only:
         df = df[df["correct"]]
@@ -192,7 +194,6 @@ def plot_hist(
                 vals,
                 return_counts=True,
             )
-            spacing = 0.2
             ax[i].bar(
                 xs,
                 counts,
@@ -200,8 +201,8 @@ def plot_hist(
                 edgecolor="0.6",
                 width=spacing,
             )
-            ax[i].set_xlim(-spacing, 1 + spacing)
-            ax[i].set_xticks([0, 0.333, 0.667, 1])
+            ax[i].set_xlim(lo-spacing, hi + spacing)
+            ax[i].set_xticks(xticks)
 
         median = vals.median()
         ax[i].axvline(
@@ -297,6 +298,7 @@ plot_hist(
     lo=0,
     hi=1,
     step=None,
+    xticks=[0,0.333, 0.667, 1],
     xlabel=r"$\mathbf{Success\ rate}$ among all participants",
     correct_only=False,
     xformatter=ticker.PercentFormatter(xmax=1),
@@ -526,4 +528,17 @@ alt.layer(
     data=pdata,
 ).save(
     "output/exp-success_rate.html",
+)
+
+plot_hist(
+    pdata,
+    feature="exp",
+    lo=1,
+    hi=10,
+    step=None,
+    xticks=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    xlabel=r"$\mathbf{Self\!-\!reported\ experience}$ among all participants",
+    correct_only=False,
+    large=True,
+    spacing=0.5,
 )
