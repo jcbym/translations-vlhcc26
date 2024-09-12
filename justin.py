@@ -137,7 +137,7 @@ def plot_hist(
     hi,
     step,
     xlabel,
-    large,
+    size,
     correct_only,
     xformatter=None,
     xticks=None, # must be set if step is None
@@ -169,12 +169,17 @@ def plot_hist(
     )
     fig.get_layout_engine().set(hspace=0.05)
 
-    if large:
+    if size == "large":
         yticks = [0, 2, 4, 6, 8, 10, 12]
         yticklabels = ["0", "", "4", "", "8", "", "12"]
-    else:
+    elif size == "medium":
+        yticks = [0, 2, 4, 6, 8]
+        yticklabels = ["0", "", "4", "", "8"]
+    elif size == "small":
         yticks = [0, 1, 2, 3, 4]
         yticklabels = ["0", "", "2", "", "4"]
+    else:
+        raise ValueError(f"Unknown size '{size}'")
 
     for i, interface in enumerate(INTERFACE_ORDER):
         vals = df[df["interface"] == interface][feature].astype(float)
@@ -289,7 +294,7 @@ plot_hist(
     step=10,
     xlabel=r"$\mathbf{Time\ taken}$ (in minutes) among successful participants",
     correct_only=True,
-    large=False,
+    size="small",
 )
 
 plot_hist(
@@ -302,7 +307,7 @@ plot_hist(
     xlabel=r"$\mathbf{Success\ rate}$ among all participants",
     correct_only=False,
     xformatter=ticker.PercentFormatter(xmax=1),
-    large=True,
+    size="large",
 )
 
 # %% Bootstrap feature estimators
@@ -539,6 +544,6 @@ plot_hist(
     xticks=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
     xlabel=r"$\mathbf{Self\!-\!reported\ experience}$ among all participants",
     correct_only=False,
-    large=True,
+    size="medium",
     spacing=0.5,
 )
