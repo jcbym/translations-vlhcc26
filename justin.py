@@ -15,7 +15,7 @@ pd.set_option("future.no_silent_downcasting", True)
 INTERFACES = [
     ("control", "Basic-Control", 0),
     ("translation", "Basic-Translation", 0),
-    ("llmBasic", "Basic-NL", 1),
+    ("llmBasic", "Alt-NL", 1),
     ("highlighting", "Pointed-Highlight", 2),
     ("canonicalization", "Pointed-Individual", 2),
     ("sequence", "Pointed-StepByStep", 2),
