@@ -140,8 +140,8 @@ def plot_hist(
     size,
     correct_only,
     xformatter=None,
-    xticks=None, # must be set if step is None
-    spacing=0.2, # only applies if step is None
+    xticks=None,  # must be set if step is None
+    spacing=0.2,  # only applies if step is None
 ):
     if correct_only:
         df = df[df["correct"]]
@@ -206,7 +206,7 @@ def plot_hist(
                 edgecolor="0.6",
                 width=spacing,
             )
-            ax[i].set_xlim(lo-spacing, hi + spacing)
+            ax[i].set_xlim(lo - spacing, hi + spacing)
             ax[i].set_xticks(xticks)
 
         median = vals.median()
@@ -303,7 +303,7 @@ plot_hist(
     lo=0,
     hi=1,
     step=None,
-    xticks=[0,0.333, 0.667, 1],
+    xticks=[0, 0.333, 0.667, 1],
     xlabel=r"$\mathbf{Success\ rate}$ among all participants",
     correct_only=False,
     xformatter=ticker.PercentFormatter(xmax=1),
@@ -369,7 +369,7 @@ def bootstrap_forest(
                 n_resamples=99999,
                 confidence_level=0.95,
                 alternative="two-sided",
-                method="percentile",
+                method="BCa",
                 random_state=0,
             )
             low = result.confidence_interval.low
@@ -487,9 +487,115 @@ bootstrap_forest(
     },
 )
 
-# %% Look at participant information
+# %% Calculate effect sizes
 
-import altair as alt
+dfs = []
+
+for int1, g1 in data.groupby("interface"):
+    name2 = []
+    success_rate_est = []
+    success_rate_lo = []
+    success_rate_hi = []
+    task_time_est = []
+    task_time_lo = []
+    task_time_hi = []
+    for int2, g2 in data.groupby("interface"):
+        if int1 == int2:
+            continue
+
+        name2.append(int2)
+
+        sr = stats.bootstrap(
+            (g1["success_rate"], g2["success_rate"]),
+            lambda s1, s2: np.mean(s2) - np.mean(s1),
+            n_resamples=99999,
+            confidence_level=0.95,
+            alternative="two-sided",
+            method="BCa",
+            random_state=0,
+        ).confidence_interval
+        success_rate_est.append(
+            np.mean(g2["success_rate"]) - np.mean(g1["success_rate"])
+        )
+        success_rate_lo.append(sr.low)
+        success_rate_hi.append(sr.high)
+
+        c1 = g1[g1["correct"]]
+        c2 = g2[g2["correct"]]
+
+        tt = stats.bootstrap(
+            (c1["taskTime"], c2["taskTime"]),
+            lambda s1, s2: np.median(s2) - np.median(s1),
+            n_resamples=99999,
+            confidence_level=0.95,
+            alternative="two-sided",
+            method="BCa",
+            random_state=0,
+        ).confidence_interval
+        task_time_est.append(np.median(c2["taskTime"]) - np.median(c1["taskTime"]))
+        task_time_lo.append(tt.low)
+        task_time_hi.append(tt.high)
+
+    dfs.append(
+        pd.DataFrame(
+            {
+                "name1": int1,
+                "name2": name2,
+                "success_rate_est": success_rate_est,
+                "success_rate_lo": success_rate_lo,
+                "success_rate_hi": success_rate_hi,
+                "task_time_est": task_time_est,
+                "task_time_lo": task_time_lo,
+                "task_time_hi": task_time_hi,
+            }
+        )
+    )
+
+effect_sizes = pd.concat(dfs)
+effect_sizes
+
+# %% Plot effect sizes
+
+reference = "Basic-Control"
+df = effect_sizes[effect_sizes["name1"] == reference].copy()
+df["order"] = df["name2"].apply(lambda n: INTERFACE_ORDER.index(n))
+df.sort_values(by="order", ascending=False, inplace=True)
+
+for feature, flow, fhigh, fstep in [
+    ("success_rate", -0.6, 0.6, 0.2),
+    ("task_time", -40, 40, 5),
+]:
+    fig, ax = plt.subplots(1, 1, figsize=(8, 3))
+
+    yticks = np.arange(0, len(df))
+    yticklabels = df["name2"]
+
+    ax.errorbar(
+        df[f"{feature}_est"],
+        yticks,
+        xerr=[
+            df[f"{feature}_est"] - df[f"{feature}_lo"],
+            df[f"{feature}_hi"] - df[f"{feature}_est"],
+        ],
+        color="black",
+        fmt="o",
+        zorder=10,
+    )
+    ax.set_yticks(yticks, labels=yticklabels)
+
+    ax.set_xticks(np.arange(flow, fhigh + 0.0001, fstep))
+    ax.set_xlabel(f"{feature} compared to {reference}")
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    ax.axvline(0, ls="--", c="lightgray", zorder=1)
+    fig.tight_layout()
+    fig.savefig(f"output/ES_{feature}.pdf")
+    plt.close(fig)
+
+
+# %% Look at participant information
 
 participants = pd.read_csv(
     "participants.csv",
@@ -507,33 +613,33 @@ pdata = pd.merge(
 
 pdata["exp"] = pdata["exp"].astype(int)
 
-alt.Chart(pdata).mark_boxplot().encode(
-    alt.X("exp:Q"),
-    alt.Y("taskTime:Q"),
-).save(
-    "output/exp-taskTime.html",
-)
-
-alt.layer(
-    alt.Chart()
-    .mark_errorbar(extent="ci")
-    .encode(
-        alt.X("exp:Q"),
-        alt.Y("success_rate:Q"),
-    ),
-    alt.Chart()
-    .mark_point(
-        filled=True,
-        color="black",
-    )
-    .encode(
-        alt.X("exp:Q"),
-        alt.Y("mean(success_rate):Q"),
-    ),
-    data=pdata,
-).save(
-    "output/exp-success_rate.html",
-)
+# alt.Chart(pdata).mark_boxplot().encode(
+#     alt.X("exp:Q"),
+#     alt.Y("taskTime:Q"),
+# ).save(
+#     "output/exp-taskTime.html",
+# )
+#
+# alt.layer(
+#     alt.Chart()
+#     .mark_errorbar(extent="ci")
+#     .encode(
+#         alt.X("exp:Q"),
+#         alt.Y("success_rate:Q"),
+#     ),
+#     alt.Chart()
+#     .mark_point(
+#         filled=True,
+#         color="black",
+#     )
+#     .encode(
+#         alt.X("exp:Q"),
+#         alt.Y("mean(success_rate):Q"),
+#     ),
+#     data=pdata,
+# ).save(
+#     "output/exp-success_rate.html",
+# )
 
 plot_hist(
     pdata,
