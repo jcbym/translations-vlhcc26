@@ -1,3 +1,5 @@
 .venv
 output/*.pdf
 output/*.html
+.ipynb_checkpoints
+.virtual_documents
