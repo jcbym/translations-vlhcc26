@@ -1,0 +1,19 @@
+[project]
+name = "jy-ms"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "polars-lts-cpu>=1.9.0",
+    "matplotlib>=3.9.2",
+    "numpy>=2.1.1",
+]
+
+[tool.ruff]
+line-length = 80
+
+[tool.uv]
+dev-dependencies = [
+    "ipython>=9.0.2",
+]
