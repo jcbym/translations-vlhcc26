@@ -1,314 +1,151 @@
 # %% Import
 
+import lib
+
+import importlib
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
-import pandas as pd
-import scipy.stats as stats
+import polars as pl
 
-pd.set_option("future.no_silent_downcasting", True)
+from cmdstanpy import CmdStanModel
+
+importlib.reload(lib)
 
 # Color-blind-friendly color schemes: https://personal.sron.nl/~pault/
 
-# %% Define interfaces and order
+# % % Load interface metadata
 
-INTERFACES = [
-    ("control", "Basic-Control", 0),
-    ("translation", "Basic-Translation", 0),
-    ("llmBasic", "Alt-NL", 1),
-    ("highlighting", "Pointed-Highlight", 2),
-    ("canonicalization", "Pointed-Individual", 2),
-    ("sequence", "Pointed-StepByStep", 2),
-    ("llmTranslation", "Pointed-Translation+NL", 2),
-]
+interfaces = pl.read_csv("interfaces.csv").with_row_index(
+    "interface_id",
+    offset=1,
+)
 
-INTERFACE_ORDER = [label for (_, label, _) in INTERFACES]
-EXPERIMENTS = {i: e for (_, i, e) in INTERFACES}
+interface_groups = pl.read_csv("interface_groups.csv")
+participants = pl.read_csv("participants.csv")
 
-# %% Load (wide) data
+# % % Load (wide) data
 
-wide = pd.read_csv(
-    "data.csv",
-    dtype=object,
-    keep_default_na=False,
-)[
+wide = pl.read_csv("data.csv")[
     [
         "userID",
         "interface",
-        "timesRan1",
-        "timesRan2",
-        "timesRan3",
-        "timesUsed1",
-        "timesUsed2",
-        "timesUsed3",
-        "taskTime1",
-        "taskTime2",
-        "taskTime3",
         "correct1",
         "correct2",
         "correct3",
+        "taskTime1",
+        "taskTime2",
+        "taskTime3",
     ]
 ]
 
-wide["interface"] = wide["interface"].replace({k: v for (k, v, _) in INTERFACES})
-
-for c in [
-    "timesRan1",
-    "timesRan2",
-    "timesRan3",
-    "timesUsed1",
-    "timesUsed2",
-    "timesUsed3",
-]:
-    wide[c] = wide[c].replace("", 0).astype(int)
-
-# Express task time in minutes
-for c in [
-    "taskTime1",
-    "taskTime2",
-    "taskTime3",
-]:
-    wide[c] = (wide[c].astype(float) / 1000) / 60
-
-for c in [
-    "correct1",
-    "correct2",
-    "correct3",
-]:
-    vals = wide[c]
-
-    # Treat "skipped" as incorrect (put "skipped" in new column)
-    wide[c] = vals.replace(
-        {
-            "": False,
-            "FALSE": False,
-            "TRUE": True,
-        }
-    ).astype(bool)
-
-    skip_c = f"skipped{c[-1]}"
-    wide[skip_c] = vals.replace(
-        {
-            "": True,
-            "FALSE": False,
-            "TRUE": False,
-        }
-    ).astype(bool)
-
-wide
-
-# %% Convert to long format
-
-long = pd.wide_to_long(
-    wide,
-    ["timesRan", "timesUsed", "taskTime", "correct", "skipped"],
-    i=["userID", "interface"],
-    j="task",
-).reset_index()
-
-long["success_rate"] = long["correct"].astype(float) / 3
-
-long
-
-# %% Aggregate over tasks
-
-data = (
-    long.groupby(["userID", "interface"])
-    .agg(
-        {
-            "timesRan": "sum",
-            "timesUsed": "sum",
-            "taskTime": "sum",
-            "correct": "all",
-            "success_rate": "sum",
-        }
+for task in [1, 2, 3]:
+    wide = wide.with_columns(
+        # Consider "skip" unsuccessful
+        pl.col(f"correct{task}").fill_null(pl.lit(False)),
+        # Express task time in minutes
+        pl.col(f"taskTime{task}").cast(float) / (1000 * 60),
     )
-    .reset_index()
+
+wide = (
+    wide.join(participants, left_on="userID", right_on="id")
+    .join(interfaces, left_on="interface", right_on="interface_tag")
+    .join(
+        interface_groups,
+        on="interface_group",
+    )
 )
 
-# %% Distribution of features
+# # % % Convert to long format
+#
+# long = lib.wide_to_long(
+#     wide,
+#     index=["userID", "interface"],
+#     stubnames=["taskTime", "correct"],
+#     suffixes=[1, 2, 3],
+#     suffix_name="task",
+# ).with_columns(
+#     success_rate=pl.col("correct").cast(float) / 3,
+# )
+#
+# # % % Aggregate over tasks
+#
+# data = (
+#     long.group_by("userID", "interface")
+#     .agg(
+#         pl.col("taskTime").sum(),
+#         pl.col("correct").all(),
+#         pl.col("success_rate").sum(),
+#     )
+#     .join(participants, left_on="userID", right_on="id")
+#     .join(interfaces, left_on="interface", right_on="interface_tag")
+#     .join(
+#         interface_groups,
+#         on="interface_group",
+#     )
+# )
+#
+# # % % Distribution of features
+#
+# lib.feature_histogram(
+#     data,
+#     group_feature="interface_label",
+#     value_feature="exp",
+#     sort_feature="interface_order",
+#     mode="discrete",
+#     xticks=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+#     xlabel=r"$\mathbf{Self\!-\!reported\ experience}$ among all participants",
+#     size="medium",
+#     spacing=0.5,
+# )[0].save(
+#     "output/hist_exp.pdf",
+#     bbox_inches="tight",
+# )
+#
+# lib.feature_histogram(
+#     data.filter(pl.col("correct")),
+#     group_feature="interface_label",
+#     value_feature="taskTime",
+#     sort_feature="interface_order",
+#     mode="continuous",
+#     xticks=np.arange(0, 91, 10),
+#     xlabel=r"$\mathbf{Time\ taken}$ (in minutes) among successful participants",
+#     size="small",
+# )[0].save(
+#     "output/hist_tt.pdf",
+#     bbox_inches="tight",
+# )
+#
+# lib.feature_histogram(
+#     data,
+#     group_feature="interface_label",
+#     value_feature="success_rate",
+#     sort_feature="interface_order",
+#     mode="discrete",
+#     xticks=[0, 0.333, 0.667, 1],
+#     xlabel=r"$\mathbf{Success\ rate}$ among all participants",
+#     size="large",
+#     xformatter=ticker.PercentFormatter(xmax=1),
+# )[0].save(
+#     "output/hist_sr.pdf",
+#     bbox_inches="tight",
+# )
 
+# %% Bayes
 
-def plot_hist(
-    df,
-    *,
-    feature,
-    lo,
-    hi,
-    step,
-    xlabel,
-    size,
-    correct_only,
-    xformatter=None,
-    xticks=None,  # must be set if step is None
-    spacing=0.2,  # only applies if step is None
-):
-    if correct_only:
-        df = df[df["correct"]]
+model = CmdStanModel(stan_file="model.stan")
 
-    too_low = df[feature] < lo
-    too_high = df[feature] > hi
-
-    if too_low.sum() > 0:
-        print(
-            f"WARNING: {too_low.sum()} too low for distribution-c{correct_only}-{feature}.pdf"
-        )
-        print(df[too_low])
-
-    if too_high.sum() > 0:
-        print(
-            f"WARNING: {too_high.sum()} too high for distribution-c{correct_only}-{feature}.pdf"
-        )
-        print(df[too_high])
-
-    fig, ax = plt.subplots(
-        len(INTERFACE_ORDER),
-        1,
-        figsize=(8, 6),
-        layout="constrained",
-    )
-    fig.get_layout_engine().set(hspace=0.05)
-
-    if size == "large":
-        yticks = [0, 2, 4, 6, 8, 10, 12]
-        yticklabels = ["0", "", "4", "", "8", "", "12"]
-    elif size == "medium":
-        yticks = [0, 2, 4, 6, 8]
-        yticklabels = ["0", "", "4", "", "8"]
-    elif size == "small":
-        yticks = [0, 1, 2, 3, 4]
-        yticklabels = ["0", "", "2", "", "4"]
-    else:
-        raise ValueError(f"Unknown size '{size}'")
-
-    for i, interface in enumerate(INTERFACE_ORDER):
-        vals = df[df["interface"] == interface][feature].astype(float)
-
-        if step:  # continuous
-            bins = np.arange(lo, hi + 0.0000001, step)
-            ax[i].hist(
-                vals,
-                bins=bins,
-                color="0.8",
-                edgecolor="0.6",
-            )
-            ax[i].set_xlim(lo, hi)
-            ax[i].set_xticks(bins)
-        else:  # discrete
-            xs, counts = np.unique(
-                vals,
-                return_counts=True,
-            )
-            ax[i].bar(
-                xs,
-                counts,
-                color="0.8",
-                edgecolor="0.6",
-                width=spacing,
-            )
-            ax[i].set_xlim(lo - spacing, hi + spacing)
-            ax[i].set_xticks(xticks)
-
-        median = vals.median()
-        ax[i].axvline(
-            x=median,
-            c="#009988",
-            lw=2,
-            clip_on=False,
-            zorder=100,
-        )
-        ax[i].scatter(
-            [median],
-            [0],
-            c="#009988",
-            marker="^",
-            clip_on=False,
-            label="Median",
-            zorder=100,
-            s=50,
-        )
-
-        mean = vals.mean()
-        ax[i].axvline(
-            x=mean,
-            c="#CC3311",
-            lw=2,
-            clip_on=False,
-            zorder=100,
-        )
-        ax[i].scatter(
-            [mean],
-            [0],
-            c="#CC3311",
-            marker="x",
-            clip_on=False,
-            label="Mean",
-            zorder=100,
-            s=50,
-        )
-
-        if i == 0:
-            ax[i].legend(bbox_to_anchor=(1.05, 1.05))
-
-        if xformatter:
-            ax[i].xaxis.set_major_formatter(xformatter)
-
-        ax[i].set_ylim(0, 1)
-        ax[i].set_yticks(yticks, labels=yticklabels)
-
-        ax[i].spines["top"].set_visible(False)
-        ax[i].spines["right"].set_visible(False)
-
-        ax[i].text(
-            -0.15,
-            0.5,
-            interface,
-            ha="right",
-            va="center",
-            fontweight="bold",
-            transform=ax[i].transAxes,
-        )
-
-    ax[-1].set_xlabel(
-        xlabel,  #  + " – " + ("continuous" if step else "discrete") + " data",
-        fontsize=10,
-    )
-
-    # ax[int((len(INTERFACES) - 1) / 2)].set_ylabel(
-    #     "Relative frequency",
-    #     fontsize=10,
-    #     fontweight="bold",
-    # )
-
-    fig.savefig(
-        f"output/distribution-c{correct_only}-{feature}.pdf",
-        bbox_inches="tight",
-    )
-
-
-plot_hist(
-    data,
-    feature="taskTime",
-    lo=0,
-    hi=90,
-    step=10,
-    xlabel=r"$\mathbf{Time\ taken}$ (in minutes) among successful participants",
-    correct_only=True,
-    size="small",
+fit = model.sample(
+    data={
+        "N": len(wide),
+        "T": 3,
+        "I": len(wide["interface_id"].unique()),
+        "interface": wide["interface_id"].to_numpy(),
+        "correct": wide[["correct1", "correct2", "correct3"]].to_numpy(),
+    }
 )
 
-plot_hist(
-    data,
-    feature="success_rate",
-    lo=0,
-    hi=1,
-    step=None,
-    xticks=[0, 0.333, 0.667, 1],
-    xlabel=r"$\mathbf{Success\ rate}$ among all participants",
-    correct_only=False,
-    xformatter=ticker.PercentFormatter(xmax=1),
-    size="large",
-)
+fit.summary()
 
 # %% Bootstrap feature estimators
 
@@ -324,11 +161,7 @@ def bootstrap_forest(
     correct_only,
     spacing=1.5,
     padding=0.5,
-    experiment_colors={
-        0: "#004488",
-        1: "#6699CC",
-        2: "#994455",
-    },
+    experiment_colors={},
     xlabel=None,
     xformatter=None,
     text_format=None,
@@ -400,7 +233,10 @@ def bootstrap_forest(
         ax.errorbar(
             [row["estimate"]],
             [row["coord"]],
-            xerr=[[row["estimate"] - row["low"]], [row["high"] - row["estimate"]]],
+            xerr=[
+                [row["estimate"] - row["low"]],
+                [row["high"] - row["estimate"]],
+            ],
             color=row["color"],
             fmt="o",
         )
@@ -445,7 +281,9 @@ def bootstrap_forest(
     ax.set_xticks(np.arange(lo, hi + 0.0000001, step))
     if xformatter:
         ax.xaxis.set_major_formatter(xformatter)
-    ax.set_xlabel(xlabel if xlabel else f"$\\mathbf{{{estimator_name}\\ {feature}}}$")
+    ax.set_xlabel(
+        xlabel if xlabel else f"$\\mathbf{{{estimator_name}\\ {feature}}}$"
+    )
 
     ax.set_ylim(df["coord"].min() - padding, df["coord"].max() + padding)
     ax.set_yticks(df["coord"], labels=df["interface"])
@@ -532,7 +370,9 @@ for int1, g1 in data.groupby("interface"):
             method="BCa",
             random_state=0,
         ).confidence_interval
-        task_time_est.append(np.median(c2["taskTime"]) - np.median(c1["taskTime"]))
+        task_time_est.append(
+            np.median(c2["taskTime"]) - np.median(c1["taskTime"])
+        )
         task_time_lo.append(tt.low)
         task_time_hi.append(tt.high)
 
@@ -640,16 +480,3 @@ pdata["exp"] = pdata["exp"].astype(int)
 # ).save(
 #     "output/exp-success_rate.html",
 # )
-
-plot_hist(
-    pdata,
-    feature="exp",
-    lo=1,
-    hi=10,
-    step=None,
-    xticks=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-    xlabel=r"$\mathbf{Self\!-\!reported\ experience}$ among all participants",
-    correct_only=False,
-    size="medium",
-    spacing=0.5,
-)

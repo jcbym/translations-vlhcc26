@@ -1,0 +1,8 @@
+interface_tag,interface_label,interface_group
+control,Basic-Control,0
+translation,Basic-Translation,0
+llmBasic,Alt-NL,1
+highlighting,Pointed-Highlight,2
+canonicalization,Pointed-Individual,2
+sequence,Pointed-StepByStep,2
+llmTranslation,Pointed-Translation+NL,2

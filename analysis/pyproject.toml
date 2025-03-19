@@ -8,6 +8,7 @@ dependencies = [
     "polars-lts-cpu>=1.9.0",
     "matplotlib>=3.9.2",
     "numpy>=2.1.1",
+    "cmdstanpy>=1.2.5",
 ]
 
 [tool.ruff]
