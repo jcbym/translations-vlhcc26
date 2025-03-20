@@ -9,10 +9,12 @@ import os
 
 
 def _save(self, filename, *args, **kwargs):
-    os.makedirs(
-        os.path.dirname(filename),
-        exist_ok=True,
-    )
+    d = os.path.dirname(filename)
+    if d:
+        os.makedirs(
+            os.path.dirname(filename),
+            exist_ok=True,
+        )
     self.savefig(filename, *args, **kwargs)
     plt.close(self)
 

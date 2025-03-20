@@ -29,22 +29,3 @@ model {
     correct[n] ~ bernoulli(theta[interface[n]]);
   }
 }
-
-generated quantities {
-  array[I] real<lower=0, upper=1> phiInterface;
-  array[T] real<lower=0, upper=1> phiTask;
-
-  for (t in 1:T) {
-    phiTask[t] = 1;
-    for (i in 1:I) {
-      phiTask[t] *= theta[i, t];
-    }
-  }
-
-  for (i in 1:I) {
-    phiInterface[i] = 1;
-    for (t in 1:T) {
-      phiInterface[i] *= theta[i, t];
-    }
-  }
-}

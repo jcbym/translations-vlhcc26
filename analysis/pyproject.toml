@@ -9,6 +9,7 @@ dependencies = [
     "matplotlib>=3.9.2",
     "numpy>=2.1.1",
     "cmdstanpy>=1.2.5",
+    "arviz>=0.21.0",
 ]
 
 [tool.ruff]

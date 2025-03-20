@@ -147,6 +147,24 @@ fit = model.sample(
 
 fit.summary()
 
+# %%
+
+# az.stats.hdi(dat, input_core_dims=[["chain","draw"]], hdi_prob=0.95).to_dataframe()
+import arviz as az
+
+importlib.reload(lib)
+
+dat = az.from_cmdstanpy(posterior=fit)
+fig = az.plot_forest(
+    dat,
+    hdi_prob=0.95,
+    kind="ridgeplot",
+    combine_dims={"chain", "draw"},
+)[0].get_figure()
+fig.save("hello.pdf")
+h = az.stats.hdi(dat, hdi_prob=0.9).values
+
+
 # %% Bootstrap feature estimators
 
 
