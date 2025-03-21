@@ -2,6 +2,7 @@
 
 import lib
 
+import arviz as az
 import importlib
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -14,7 +15,9 @@ importlib.reload(lib)
 
 # Color-blind-friendly color schemes: https://personal.sron.nl/~pault/
 
-# % % Load interface metadata
+# % % Load metadata
+
+TASKS = [1, 2, 3]
 
 interfaces = pl.read_csv("interfaces.csv").with_row_index(
     "interface_id",
@@ -30,16 +33,12 @@ wide = pl.read_csv("data.csv")[
     [
         "userID",
         "interface",
-        "correct1",
-        "correct2",
-        "correct3",
-        "taskTime1",
-        "taskTime2",
-        "taskTime3",
     ]
+    + [f"correct{task}" for task in tasks]
+    + [f"taskTime{task}" for task in tasks]
 ]
 
-for task in [1, 2, 3]:
+for task in TASKS:
     wide = wide.with_columns(
         # Consider "skip" unsuccessful
         pl.col(f"correct{task}").fill_null(pl.lit(False)),
@@ -48,11 +47,22 @@ for task in [1, 2, 3]:
     )
 
 wide = (
-    wide.join(participants, left_on="userID", right_on="id")
-    .join(interfaces, left_on="interface", right_on="interface_tag")
+    wide.join(
+        participants,
+        left_on="userID",
+        right_on="id",
+        validate="1:1",
+    )
+    .join(
+        interfaces,
+        left_on="interface",
+        right_on="interface_tag",
+        validate="m:1",
+    )
     .join(
         interface_groups,
         on="interface_group",
+        validate="m:1",
     )
 )
 
@@ -133,36 +143,77 @@ wide = (
 
 # %% Bayes
 
-model = CmdStanModel(stan_file="model.stan")
+correct_model = CmdStanModel(stan_file="correct.stan")
+time_taken_model = CmdStanModel(stan_file="time_taken.stan")
 
-fit = model.sample(
-    data={
-        "N": len(wide),
-        "T": 3,
-        "I": len(wide["interface_id"].unique()),
-        "interface": wide["interface_id"].to_numpy(),
-        "correct": wide[["correct1", "correct2", "correct3"]].to_numpy(),
-    }
-)
+posterior = {}
 
-fit.summary()
+for task in TASKS:
+    correct_fit = correct_model.sample(
+        data={
+            "N": len(wide),
+            "I": len(wide["interface_id"].unique()),
+            "interface": wide["interface_id"].to_numpy(),
+            "correct": wide[f"correct{task}"].to_numpy(),
+        }
+    )
+
+    print("correct{task}")
+    print(correct_fit.diagnose())
+    print(correct_fit.summary())
+    theta = correct_fit.stan_variable("theta")
+    theta = theta.reshape(1, theta.shape[0], theta.shape[1])
+    posterior[f"theta{task}"] = theta
+
+    time_taken_fit = time_taken_model.sample(
+        data={
+            "N": len(wide),
+            "I": len(wide["interface_id"].unique()),
+            "interface": wide["interface_id"].to_numpy(),
+            "timeTaken": wide[f"taskTime{task}"].to_numpy(),
+        }
+    )
+
+    print("taskTime{task}")
+    print(time_taken_fit.diagnose())
+    print(time_taken_fit.summary())
+    mu = time_taken_fit.stan_variable("mu")
+    mu = mu.reshape(1, mu.shape[0], mu.shape[1])
+    posterior[f"mu{task}"] = mu
+
+# %%
+
+
+def hdi(xa, hdi_prob=0.95):
+    means = pl.from_pandas(
+        xa.mean(dim=["chain", "draw"]).to_pandas().rename("mean").reset_index()
+    )
+    intervals = pl.from_pandas(
+        az.hdi(xa, hdi_prob=hdi_prob).to_dataframe().reset_index()
+    ).pivot(
+        "hdi",
+        index="interface_id",
+    )
+    return means.join(intervals, on="interface_id", validate="1:1")
+
+
+idata = az.from_dict(posterior, dims={k: ["interface_id"] for k in posterior})
+hdi(idata.posterior.theta1)
 
 # %%
 
 # az.stats.hdi(dat, input_core_dims=[["chain","draw"]], hdi_prob=0.95).to_dataframe()
-import arviz as az
 
-importlib.reload(lib)
-
-dat = az.from_cmdstanpy(posterior=fit)
-fig = az.plot_forest(
-    dat,
-    hdi_prob=0.95,
-    kind="ridgeplot",
-    combine_dims={"chain", "draw"},
-)[0].get_figure()
-fig.save("hello.pdf")
-h = az.stats.hdi(dat, hdi_prob=0.9).values
+fig = (
+    az.plot_forest(
+        dat,
+        hdi_prob=0.95,
+        combine_dims={"chain", "draw"},
+        var_names=[f"theta{task}" for task in TASKS],
+    )[0]
+    .get_figure()
+    .save("hello.pdf")
+)
 
 
 # %% Bootstrap feature estimators
