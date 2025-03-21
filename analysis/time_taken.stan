@@ -26,4 +26,11 @@ model {
 
 generated quantities {
   vector[I] mu = exp(logmu);
+
+  matrix[I, I] logmuES;
+  for (i1 in 1:I) {
+    for (i2 in 1:I) {
+      logmuES[i1, i2] = (logmu[i1] - logmu[i2]) / sigma;
+    }
+  }
 }

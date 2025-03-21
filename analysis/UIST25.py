@@ -143,16 +143,23 @@ wide = (
 
 # %% Bayes
 
+
+def get_var(fit, var):
+    x = fit.stan_variable(var)
+    return x.reshape(1, *x.shape)
+
+
 correct_model = CmdStanModel(stan_file="correct.stan")
 time_taken_model = CmdStanModel(stan_file="time_taken.stan")
 
 posterior = {}
+posteriorES = {}
 
 for task in TASKS:
     correct_fit = correct_model.sample(
         data={
             "N": len(wide),
-            "I": len(wide["interface_id"].unique()),
+            "I": len(interfaces),
             "interface": wide["interface_id"].to_numpy(),
             "correct": wide[f"correct{task}"].to_numpy(),
         }
@@ -161,44 +168,66 @@ for task in TASKS:
     print("correct{task}")
     print(correct_fit.diagnose())
     print(correct_fit.summary())
-    theta = correct_fit.stan_variable("theta")
-    theta = theta.reshape(1, theta.shape[0], theta.shape[1])
-    posterior[f"theta{task}"] = theta
+    posterior[f"theta{task}"] = get_var(correct_fit, "theta")
+    posteriorES[f"theta{task}"] = get_var(correct_fit, "thetaES")
 
     time_taken_fit = time_taken_model.sample(
         data={
             "N": len(wide),
-            "I": len(wide["interface_id"].unique()),
+            "I": len(interfaces),
             "interface": wide["interface_id"].to_numpy(),
             "timeTaken": wide[f"taskTime{task}"].to_numpy(),
         }
     )
 
-    print("taskTime{task}")
+    print(f"taskTime{task}")
     print(time_taken_fit.diagnose())
     print(time_taken_fit.summary())
-    mu = time_taken_fit.stan_variable("mu")
-    mu = mu.reshape(1, mu.shape[0], mu.shape[1])
-    posterior[f"mu{task}"] = mu
+    posterior[f"mu{task}"] = get_var(time_taken_fit, "mu")
+    posteriorES[f"logmu{task}"] = get_var(time_taken_fit, "logmuES")
 
 # %%
 
 
-def hdi(xa, hdi_prob=0.95):
-    means = pl.from_pandas(
-        xa.mean(dim=["chain", "draw"]).to_pandas().rename("mean").reset_index()
-    )
-    intervals = pl.from_pandas(
-        az.hdi(xa, hdi_prob=hdi_prob).to_dataframe().reset_index()
-    ).pivot(
-        "hdi",
-        index="interface_id",
-    )
-    return means.join(intervals, on="interface_id", validate="1:1")
+def summary(x, es, es_criteria, *, prefix, hdi_prob=0.95):
+    x_hdi = az.hdi(x, hdi_prob=hdi_prob)
+    es_hdi = az.hdi(es, hdi_prob=hdi_prob)
+
+    return {
+        f"{prefix}_mean": x.mean(axis=(0, 1)),
+        f"{prefix}_lo": x_hdi[:, 0],
+        f"{prefix}_hi": x_hdi[:, 1],
+        f"{prefix}_es_mean": es.mean(axis=(0, 1)),
+        f"{prefix}_es_lo": es_hdi[:, 0],
+        f"{prefix}_es_hi": es_hdi[:, 1],
+        f"{prefix}_p": es_criteria(es).mean(axis=(0, 1)),
+    }
 
 
-idata = az.from_dict(posterior, dims={k: ["interface_id"] for k in posterior})
-hdi(idata.posterior.theta1)
+data = {"interface_id": np.arange(1, len(interfaces) + 1)}
+
+for task in TASKS:
+    data |= summary(
+        posterior[f"theta{task}"],
+        posteriorES[f"theta{task}"][:, :, :, 0],
+        lambda x: x > 0,
+        prefix=f"theta{task}",
+    )
+
+    data |= summary(
+        posterior[f"mu{task}"],
+        posteriorES[f"logmu{task}"][:, :, :, 0],
+        lambda x: x < 0,
+        prefix=f"mu{task}",
+    )
+
+
+stats = interfaces.join(
+    pl.DataFrame(data=data),
+    on="interface_id",
+    validate="1:1",
+)
+stats.write_csv("stats.csv")
 
 # %%
 

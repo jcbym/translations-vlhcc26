@@ -24,10 +24,10 @@ model {
 }
 
 generated quantities {
-  matrix[I, I] esTheta;
+  matrix[I, I] thetaES;
   for (i1 in 1:I) {
     for (i2 in 1:I) {
-      esTheta[i1, i2] = 2 * asin(theta[i1]) - 2 * asin(theta[i2]);
+      thetaES[i1, i2] = 2 * asin(sqrt(theta[i1])) - 2 * asin(sqrt(theta[i2]));
     }
   }
 }

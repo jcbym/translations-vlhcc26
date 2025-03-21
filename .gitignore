@@ -4,3 +4,6 @@
 .ipynb_checkpoints
 .virtual_documents
 __pycache__
+
+analysis/time_taken
+analysis/correct
