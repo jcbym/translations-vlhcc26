@@ -1,0 +1,8 @@
+interface_tag,interface_label,interface_group
+control,Control,0
+translation,Translation,0
+llmBasic,Prose,1
+highlighting,T+Highlight,2
+canonicalization,T+Focus,2
+sequence,T+Steps,2
+llmTranslation,T+Prose,2

@@ -19,23 +19,23 @@ importlib.reload(lib)
 
 TASKS = [1, 2, 3]
 
-interfaces = pl.read_csv("interfaces.csv").with_row_index(
+interfaces = pl.read_csv("data/interfaces.csv").with_row_index(
     "interface_id",
     offset=1,
 )
 
-interface_groups = pl.read_csv("interface_groups.csv")
-participants = pl.read_csv("participants.csv")
+interface_groups = pl.read_csv("data/interface_groups.csv")
+participants = pl.read_csv("data/participants.csv")
 
 # % % Load (wide) data
 
-wide = pl.read_csv("data.csv")[
+wide = pl.read_csv("data/data.csv")[
     [
         "userID",
         "interface",
     ]
-    + [f"correct{task}" for task in tasks]
-    + [f"taskTime{task}" for task in tasks]
+    + [f"correct{task}" for task in TASKS]
+    + [f"taskTime{task}" for task in TASKS]
 ]
 
 for task in TASKS:
@@ -66,52 +66,57 @@ wide = (
     )
 )
 
-# # % % Convert to long format
-#
-# long = lib.wide_to_long(
-#     wide,
-#     index=["userID", "interface"],
-#     stubnames=["taskTime", "correct"],
-#     suffixes=[1, 2, 3],
-#     suffix_name="task",
-# ).with_columns(
-#     success_rate=pl.col("correct").cast(float) / 3,
-# )
-#
-# # % % Aggregate over tasks
-#
-# data = (
-#     long.group_by("userID", "interface")
-#     .agg(
-#         pl.col("taskTime").sum(),
-#         pl.col("correct").all(),
-#         pl.col("success_rate").sum(),
-#     )
-#     .join(participants, left_on="userID", right_on="id")
-#     .join(interfaces, left_on="interface", right_on="interface_tag")
-#     .join(
-#         interface_groups,
-#         on="interface_group",
-#     )
-# )
-#
-# # % % Distribution of features
-#
-# lib.feature_histogram(
-#     data,
-#     group_feature="interface_label",
-#     value_feature="exp",
-#     sort_feature="interface_order",
-#     mode="discrete",
-#     xticks=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-#     xlabel=r"$\mathbf{Self\!-\!reported\ experience}$ among all participants",
-#     size="medium",
-#     spacing=0.5,
-# )[0].save(
-#     "output/hist_exp.pdf",
-#     bbox_inches="tight",
-# )
-#
+# # % % Percent correct
+
+lib.distribution_comparison_plot(
+    wide,
+    group_feature="interface_label",
+    value_feature="exp",
+    sort_feature="interface_id",
+    color_feature="interface_color",
+    yticks=np.arange(0, 11, 1),
+    figsize=(6, 4),
+)[0].save("output/01-exp.pdf")
+
+importlib.reload(lib)
+for task in TASKS:
+    lib.count_comparison_plot(
+        wide,
+        group_feature="interface_label",
+        value_feature=f"correct{task}",
+        sort_feature="interface_id",
+        color_feature="interface_color",
+        step=2,
+        figsize=(6, 4),
+    )[0].save(f"output/02-correct{task}.pdf")
+
+    lib.distribution_comparison_plot(
+        wide.filter(pl.col(f"correct{task}")),
+        group_feature="interface_label",
+        value_feature=f"taskTime{task}",
+        sort_feature="interface_id",
+        color_feature="interface_color",
+        yticks=np.arange(0, 51, 5),
+        figsize=(6, 4),
+    )[0].save(f"output/03-time_taken{task}.pdf")
+
+# # %% Distribution of features
+
+lib.feature_histogram(
+    wide,
+    group_feature="interface_label",
+    value_feature="exp",
+    sort_feature="interface_id",
+    mode="discrete",
+    xticks=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    xlabel=r"$\mathbf{Self\!-\!reported\ experience}$ among all participants",
+    size="medium",
+    spacing=0.5,
+)[0].save(
+    "output/hist_exp.pdf",
+    bbox_inches="tight",
+)
+
 # lib.feature_histogram(
 #     data.filter(pl.col("correct")),
 #     group_feature="interface_label",
@@ -149,8 +154,8 @@ def get_var(fit, var):
     return x.reshape(1, *x.shape)
 
 
-correct_model = CmdStanModel(stan_file="correct.stan")
-time_taken_model = CmdStanModel(stan_file="time_taken.stan")
+correct_model = CmdStanModel(stan_file="stan/correct.stan")
+time_taken_model = CmdStanModel(stan_file="stan/time_taken.stan")
 
 posterior = {}
 posteriorES = {}
@@ -185,6 +190,28 @@ for task in TASKS:
     print(time_taken_fit.summary())
     posterior[f"mu{task}"] = get_var(time_taken_fit, "mu")
     posteriorES[f"logmu{task}"] = get_var(time_taken_fit, "logmuES")
+
+# %%
+
+importlib.reload(lib)
+for task in TASKS:
+    lib.es_plot(
+        posteriorES[f"theta{task}"],
+        labels=interfaces["interface_label"],
+        better="greater",
+        bins=np.arange(-2, 2.1, 0.05),
+        step=1,
+        figsize=(6, 4),
+    )[0].save(f"output/04-theta{task}.pdf")
+
+    lib.es_plot(
+        posteriorES[f"logmu{task}"],
+        labels=interfaces["interface_label"],
+        better="less",
+        bins=np.arange(-3, 3, 0.05),
+        step=1,
+        figsize=(6, 4),
+    )[0].save(f"output/04-mu{task}.pdf")
 
 # %%
 

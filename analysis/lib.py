@@ -1,5 +1,6 @@
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
 import numpy as np
 import polars as pl
 import os
@@ -39,6 +40,199 @@ def wide_to_long(df, *, index, stubnames, suffixes, suffix_name):
 
 ################################################################################
 ## Plots
+
+
+def es_plot(
+    es_draws,
+    *,
+    better,
+    labels,
+    bins,
+    step,
+    figsize,
+):
+    assert better in {"greater", "less"}
+
+    es = es_draws[:, :, :, 0].mean(axis=0).T[1:]
+    labels = labels[1:]
+    N = len(labels)
+    fig, ax = plt.subplots(N, 1, figsize=figsize)
+
+    for i in range(N):
+        assert (es[i] < max(bins)).all()
+        assert (es[i] > min(bins)).all()
+        n, _, patches = ax[i].hist(es[i], bins=bins)
+        ax[i].set_ylim(0, max(n))
+        ax[i].set_yticks([max(n) / 2], labels=[labels[i]])
+        for p in patches:
+            if (better == "greater" and p.get_x() > 0) or (
+                better == "less" and p.get_x() < 0
+            ):
+                p.set_facecolor("pink")
+        ax[i].set_xticks(np.arange(min(bins), max(bins) + step / 2, step))
+        ax[i].spines["top"].set_visible(False)
+        ax[i].spines["right"].set_visible(False)
+        ax[i].spines["left"].set_visible(False)
+        # ax[i].axes.get_yaxis().set_visible(False)
+        ax[i].axvline(x=0, c="red")
+        ax[i].tick_params(axis="both", which="both", length=0)
+
+    return fig, ax
+
+
+def count_comparison_plot(
+    df,
+    *,
+    group_feature,
+    value_feature,
+    sort_feature,
+    color_feature,
+    step,
+    figsize,
+):
+    data = (
+        df.sort(by=sort_feature)
+        .group_by(group_feature, maintain_order=True)
+        .agg(
+            pl.col(value_feature).sum().alias("sum"),
+            pl.col(value_feature).count().alias("total"),
+            pl.col(color_feature).first().alias("color"),
+        )
+    )
+    yticks = np.arange(0, max(data["total"]) + step, step)
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+    xticks = np.arange(len(data))
+    bars = ax.bar(xticks, data["sum"], color=data["color"])
+    ax.bar_label(
+        bars,
+        [
+            f"{r['sum']}\n({r['sum'] / r['total']:.0%})"
+            for r in data.iter_rows(named=True)
+        ],
+        padding=3,
+    )
+    ax.set_xticks(
+        xticks,
+        labels=data[group_feature],
+        fontsize=9,
+    )
+    for xt, bl, c in zip(ax.get_xticklabels(), ax.texts, data["color"]):
+        bl.set_color(c)
+        xt.set_color(c)
+    ax.set_yticks(yticks)
+    ax.set_ylim(min(yticks), max(yticks) + 1)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+    ax.yaxis.grid(color="1", linewidth=0.5)
+    ax.tick_params(axis="both", which="both", length=0)
+    fig.tight_layout()
+    return fig, ax
+
+
+def distribution_comparison_plot(
+    df,
+    *,
+    group_feature,
+    value_feature,
+    sort_feature,
+    color_feature,
+    yticks,
+    figsize,
+):
+    assert df[value_feature].is_between(min(yticks), max(yticks)).all()
+
+    labels = []
+    colors = []
+    vals = []
+
+    for (label,), g in df.sort(
+        by=sort_feature,
+    ).group_by(
+        group_feature,
+        maintain_order=True,
+    ):
+        labels.append(label)
+        colors.append(g[color_feature].first())
+        vals.append(g[value_feature])
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+    xticks = np.arange(len(labels))
+    bplot = ax.boxplot(
+        vals,
+        positions=xticks,
+        patch_artist=True,
+        showcaps=False,
+        boxprops=dict(linewidth=1, fill=None),
+        medianprops=dict(linewidth=2, color="0"),
+    )
+    ax.set_xticks(
+        xticks,
+        labels=labels,
+        fontsize=9,
+    )
+    boxplot_alpha = 1
+    for box, flier, med, xt, v, c in zip(
+        bplot["boxes"],
+        bplot["fliers"],
+        bplot["medians"],
+        ax.get_xticklabels(),
+        vals,
+        colors,
+    ):
+        box.set_edgecolor(c)
+        box.set_alpha(boxplot_alpha)
+        xt.set_color(c)
+        med.set_color(c)
+        med.set_alpha(boxplot_alpha)
+        med.set_linewidth(2)
+        flier.set(
+            marker="",
+            markerfacecolor=c,
+            markeredgecolor="1",
+            linewidth=0,
+        )
+        x = med.get_xdata().mean()
+        y = med.get_ydata().mean()
+        ax.text(
+            x,
+            y,
+            "",  # f"{y:.1f}",
+            ha="center",
+            va="center",
+            color="1",
+            fontsize=7,
+            bbox=dict(
+                boxstyle="square,pad=0.05",
+                fc=c,
+                ec="none",
+            ),
+        )
+        np.random.seed(0)
+        spread = 0.3
+        ax.scatter(
+            x + np.random.uniform(low=-spread, high=spread, size=len(v)),
+            v,
+            color=c,
+            zorder=10,
+            s=20,
+            alpha=1,
+            lw=0,
+            marker="",
+            # ec="0",
+        )
+    for i, whis in enumerate(bplot["whiskers"]):
+        c = colors[i // 2]
+        whis.set_color(c)
+        whis.set_alpha(boxplot_alpha)
+        whis.set_linewidth(1)
+    ax.set_yticks(yticks)
+    ax.set_ylim(min(yticks), max(yticks))
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+    ax.tick_params(axis="both", which="both", length=0)
+    fig.tight_layout()
+    return fig, ax
 
 
 def feature_histogram(
