@@ -5,6 +5,6 @@
 .virtual_documents
 __pycache__
 
-analysis/time_taken
-analysis/correct
+analysis/stan/time_taken
+analysis/stan/correct
 analysis/output
