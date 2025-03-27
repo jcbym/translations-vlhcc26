@@ -1,6 +1,6 @@
+import arviz as az
 import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mtick
 import numpy as np
 import polars as pl
 import os
@@ -45,38 +45,188 @@ def wide_to_long(df, *, index, stubnames, suffixes, suffix_name):
 def es_plot(
     es_draws,
     *,
+    measure,
     better,
     labels,
+    colors,
     bins,
     step,
     figsize,
+    hdi_prob=0.95,
 ):
     assert better in {"greater", "less"}
 
     es = es_draws[:, :, :, 0].mean(axis=0).T[1:]
     labels = labels[1:]
+    colors = colors[1:]
+
     N = len(labels)
-    fig, ax = plt.subplots(N, 1, figsize=figsize)
+    fig, ax = plt.subplots(
+        N,
+        1,
+        figsize=figsize,
+        gridspec_kw={"wspace": 0, "hspace": 0},
+    )
 
     for i in range(N):
         assert (es[i] < max(bins)).all()
         assert (es[i] > min(bins)).all()
-        n, _, patches = ax[i].hist(es[i], bins=bins)
-        ax[i].set_ylim(0, max(n))
-        ax[i].set_yticks([max(n) / 2], labels=[labels[i]])
+
+        n, _, patches = ax[i].hist(
+            es[i],
+            bins=bins,
+            color="0.8",
+            edgecolor="0",
+            linewidth=0.2,
+        )
+        ymax = 1.1 * max(n)
+        ax[i].set_ylim(0, ymax)
+        ax[i].set_yticks([ymax / 2], labels=[labels[i]])
+        ax[i].get_yticklabels()[0].set_color(colors[i])
         for p in patches:
-            if (better == "greater" and p.get_x() > 0) or (
-                better == "less" and p.get_x() < 0
+            if (better == "greater" and p.get_x() > -0.00001) or (
+                better == "less" and p.get_x() + p.get_width() < 0
             ):
-                p.set_facecolor("pink")
+                p.set_facecolor(colors[i])
         ax[i].set_xticks(np.arange(min(bins), max(bins) + step / 2, step))
+        if i < N - 1:
+            ax[i].set_xticks([])
+
         ax[i].spines["top"].set_visible(False)
         ax[i].spines["right"].set_visible(False)
         ax[i].spines["left"].set_visible(False)
-        # ax[i].axes.get_yaxis().set_visible(False)
-        ax[i].axvline(x=0, c="red")
+        ax[i].axvline(x=0, c="black", lw=1)
         ax[i].tick_params(axis="both", which="both", length=0)
 
+        if better == "greater":
+            pb = (es[i] > 0).mean()
+            pb_x = max(bins)
+            pb_ha = "right"
+
+            pw_x = min(bins)
+            pw_ha = "left"
+        else:
+            pb = (es[i] < 0).mean()
+            pb_x = min(bins)
+            pb_ha = "left"
+
+            pw_x = max(bins)
+            pw_ha = "right"
+
+        ax[i].text(
+            pb_x,
+            ymax / 2,
+            r"$\mathbb{P}(\sf{better}) \approx $" + f"{pb:0.2f}",
+            ha=pb_ha,
+            va="center",
+            color=colors[i],
+            fontsize=7,
+        )
+
+        ax[i].text(
+            pw_x,
+            ymax / 2,
+            r"$\mathbb{P}(\sf{worse}) \approx $" + f"{1 - pb:0.2f}",
+            ha=pw_ha,
+            va="center",
+            color="0.4",
+            fontsize=7,
+        )
+
+        am = np.argmax(n)
+        mode = (bins[am] + bins[am + 1]) / 2
+        # ax[i].text(
+        #     mode - 0.4,
+        #     0.9 * ymax,
+        #     f"mode = {mode:0.2f}",
+        #     fontsize=7,
+        #     color=colors[i],
+        #     va="top",
+        #     ha="right",
+        # )
+        ax[i].text(
+            mode,
+            0.6 * ymax,
+            f"{mode:+0.2f}",
+            fontsize=6,
+            color=colors[i],
+            va="top",
+            ha="center",
+            bbox=dict(
+                pad=0.5,
+                facecolor="1",
+                ec=colors[i],
+                lw=0.5,
+            ),
+        )
+        ax[i].axvline(x=mode, lw=1, c="1")
+
+        lo, hi = az.hdi(es[i], hdi_prob=hdi_prob)
+        ax[i].plot(
+            [lo, hi],
+            [0.1 * ymax, 0.1 * ymax],
+            color="1",
+            lw=1,
+        )
+
+        ax[i].text(
+            lo,
+            0.2 * ymax,
+            f"{lo:+0.2f}",
+            fontsize=6,
+            color=colors[i],
+            va="bottom",
+            ha="center",
+            bbox=dict(
+                pad=0.5,
+                facecolor="1",
+                ec=colors[i],
+                lw=0.5,
+            ),
+        )
+
+        ax[i].text(
+            hi,
+            0.2 * ymax,
+            f"{hi:+0.2f}",
+            fontsize=6,
+            color=colors[i],
+            va="bottom",
+            ha="center",
+            bbox=dict(
+                pad=0.5,
+                facecolor="1",
+                ec=colors[i],
+                lw=0.5,
+            ),
+        )
+
+    # offset = 0.15 * (1 if better == "greater" else -1)
+
+    ax[-1].set_xlabel(
+        r"$\bf{" + measure.replace(" ", r"\ ") + r"}$ effect size"
+    )
+    better_label = "    Better →" if better == "greater" else "← Better    "
+    # ax[0].tick_params(top=True, labeltop=True, bottom=False, labelbottom=False)
+    ax[0].text(0, 1.1 * ymax, better_label, ha="center", va="bottom")
+
+    # ax[-1].annotate(
+    #     "Better",
+    #     xy=(0.5 + offset, -0.5),
+    #     xytext=(0.5, -0.5),
+    #     xycoords="axes fraction",
+    #     arrowprops=dict(
+    #         arrowstyle="-|>",
+    #         facecolor="black",
+    #         relpos=(0.5 + offset / 2, 0.5),
+    #         lw=3,
+    #     ),
+    #     va="center",
+    #     ha="center",
+    #     weight="bold",
+    # )
+
+    fig.tight_layout()
     return fig, ax
 
 
@@ -102,7 +252,12 @@ def count_comparison_plot(
     yticks = np.arange(0, max(data["total"]) + step, step)
     fig, ax = plt.subplots(1, 1, figsize=figsize)
     xticks = np.arange(len(data))
-    bars = ax.bar(xticks, data["sum"], color=data["color"])
+    bars = ax.bar(
+        xticks,
+        data["sum"],
+        color=[(c, 0.5) for c in data["color"]],
+        edgecolor=[(c, 1) for c in data["color"]],
+    )
     ax.bar_label(
         bars,
         [
@@ -162,8 +317,6 @@ def distribution_comparison_plot(
         positions=xticks,
         patch_artist=True,
         showcaps=False,
-        boxprops=dict(linewidth=1, fill=None),
-        medianprops=dict(linewidth=2, color="0"),
     )
     ax.set_xticks(
         xticks,
@@ -179,14 +332,15 @@ def distribution_comparison_plot(
         vals,
         colors,
     ):
-        box.set_edgecolor(c)
-        box.set_alpha(boxplot_alpha)
+        box.set_facecolor((c, 0.5))
+        box.set_edgecolor((c, 1))
+        box.set_linewidth(1)
         xt.set_color(c)
-        med.set_color(c)
         med.set_alpha(boxplot_alpha)
+        med.set_color(c)
         med.set_linewidth(2)
         flier.set(
-            marker="",
+            marker="o",
             markerfacecolor=c,
             markeredgecolor="1",
             linewidth=0,
