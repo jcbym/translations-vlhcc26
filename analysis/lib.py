@@ -46,6 +46,8 @@ def es_plot(
     es_draws,
     *,
     measure,
+    better_notion,
+    worse_notion,
     better,
     labels,
     colors,
@@ -69,9 +71,6 @@ def es_plot(
     )
 
     for i in range(N):
-        assert (es[i] < max(bins)).all()
-        assert (es[i] > min(bins)).all()
-
         n, _, patches = ax[i].hist(
             es[i],
             bins=bins,
@@ -116,7 +115,10 @@ def es_plot(
         ax[i].text(
             pb_x,
             ymax / 2,
-            r"$\mathbb{P}(\sf{better}) \approx $" + f"{pb:0.2f}",
+            r"$\mathbb{P}(\sf{"
+            + better_notion
+            + r"}) \approx $"
+            + f"{pb:0.2f}",
             ha=pb_ha,
             va="center",
             color=colors[i],
@@ -126,7 +128,10 @@ def es_plot(
         ax[i].text(
             pw_x,
             ymax / 2,
-            r"$\mathbb{P}(\sf{worse}) \approx $" + f"{1 - pb:0.2f}",
+            r"$\mathbb{P}(\sf{"
+            + worse_notion
+            + r"}) \approx $"
+            + f"{1 - pb:0.2f}",
             ha=pw_ha,
             va="center",
             color="0.4",
@@ -206,9 +211,8 @@ def es_plot(
     ax[-1].set_xlabel(
         r"$\bf{" + measure.replace(" ", r"\ ") + r"}$ effect size"
     )
-    better_label = "    Better →" if better == "greater" else "← Better    "
-    # ax[0].tick_params(top=True, labeltop=True, bottom=False, labelbottom=False)
-    ax[0].text(0, 1.1 * ymax, better_label, ha="center", va="bottom")
+    # better_label = "    Better →" if better == "greater" else "← Better    "
+    # ax[0].text(0, 1.1 * ymax, better_label, ha="center", va="bottom")
 
     # ax[-1].annotate(
     #     "Better",
@@ -543,4 +547,40 @@ def feature_histogram(
         fontsize=10,
     )
 
+    return fig, ax
+
+
+def teaser_plot(data, *, color):
+    fig, ax = plt.subplots(1, 1, figsize=(5, 0.8))
+
+    ax.set_yticks([0], labels=[""])
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+    ax.tick_params(axis="both", which="both", length=0)
+
+    xticks = [0, 0.25, 0.5, 0.75, 1]
+    ax.set_xticks(
+        xticks,
+        labels=["0%", "25%", "50%", "75%", "100%"],
+    )
+    for left, right in zip(xticks, xticks[1:]):
+        ax.plot(
+            [left, right],
+            [0, 0],
+            marker="|",
+            color="0.8",
+        )
+
+    y = np.zeros_like(data)
+    ax.scatter(
+        data,
+        y,
+        color=color,
+        s=80,
+        zorder=10,
+    )
+
+    fig.tight_layout()
     return fig, ax

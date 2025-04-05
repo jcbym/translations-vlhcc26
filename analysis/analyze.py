@@ -4,6 +4,7 @@ import lib
 
 import arviz as az
 import importlib
+import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 
@@ -11,7 +12,9 @@ from cmdstanpy import CmdStanModel
 
 importlib.reload(lib)
 
-# Color-blind-friendly color schemes: https://personal.sron.nl/~pault/
+# % % Global matplotlib configuration
+
+plt.rcParams["font.family"] = "PT Sans"
 
 # % % Load metadata
 
@@ -113,40 +116,80 @@ time_taken_model = CmdStanModel(stan_file="stan/time_taken.stan")
 posterior = {}
 posteriorES = {}
 
-for task in TASKS:
-    correct_fit = correct_model.sample(
-        data={
-            "N": len(wide),
-            "I": len(interfaces),
-            "interface": wide["interface_id"].to_numpy(),
-            "correct": wide[f"correct{task}"].to_numpy(),
-        },
-        chains=8,
-        iter_sampling=10_000,
-    )
+with open("output/model_diagnostics.txt", "w") as f:
+    for task in TASKS:
+        correct_fit = correct_model.sample(
+            data={
+                "N": len(wide),
+                "I": len(interfaces),
+                "interface": wide["interface_id"].to_numpy(),
+                "correct": wide[f"correct{task}"].to_numpy(),
+            },
+            chains=8,
+            iter_sampling=10_000,
+        )
 
-    print(f"correct{task}")
-    print(correct_fit.diagnose())
-    print(correct_fit.summary())
-    posterior[f"theta{task}"] = get_var(correct_fit, "theta")
-    posteriorES[f"theta{task}"] = get_var(correct_fit, "thetaES")
+        print("========================================", file=f)
+        print(f"correct ({task})", file=f)
+        print("========================================", file=f)
+        print(correct_fit.diagnose(), file=f)
+        print(correct_fit.summary().to_string(), file=f)
+        posterior[f"theta{task}"] = get_var(correct_fit, "theta")
+        posteriorES[f"theta{task}"] = get_var(correct_fit, "thetaES")
 
-    time_taken_fit = time_taken_model.sample(
-        data={
-            "N": len(wide),
-            "I": len(interfaces),
-            "interface": wide["interface_id"].to_numpy(),
-            "timeTaken": wide[f"taskTime{task}"].to_numpy(),
-        },
-        chains=8,
-        iter_sampling=10_000,
-    )
+        df = wide.filter(pl.col(f"correct{task}"))
 
-    print(f"taskTime{task}")
-    print(time_taken_fit.diagnose())
-    print(time_taken_fit.summary())
-    posterior[f"mu{task}"] = get_var(time_taken_fit, "mu")
-    posteriorES[f"logmu{task}"] = get_var(time_taken_fit, "logmuES")
+        correct_time_taken_fit = time_taken_model.sample(
+            data={
+                "N": len(df),
+                "I": len(interfaces),
+                "interface": df["interface_id"].to_numpy(),
+                "timeTaken": df[f"taskTime{task}"].to_numpy(),
+            },
+            chains=8,
+            iter_sampling=10_000,
+        )
+
+        print("========================================", file=f)
+        print(f"correct_time_taken ({task})", file=f)
+        print("========================================", file=f)
+        print(correct_time_taken_fit.diagnose(), file=f)
+        print(correct_time_taken_fit.summary().to_string(), file=f)
+        posterior[f"correct_mu{task}"] = get_var(
+            correct_time_taken_fit,
+            "mu",
+        )
+        posteriorES[f"correct_logmu{task}"] = get_var(
+            correct_time_taken_fit,
+            "logmuES",
+        )
+
+        df = wide.filter(~pl.col(f"correct{task}"))
+
+        incorrect_time_taken_fit = time_taken_model.sample(
+            data={
+                "N": len(df),
+                "I": len(interfaces),
+                "interface": df["interface_id"].to_numpy(),
+                "timeTaken": df[f"taskTime{task}"].to_numpy(),
+            },
+            chains=8,
+            iter_sampling=20_000,
+        )
+
+        print("========================================", file=f)
+        print(f"incorrect_time_taken ({task})", file=f)
+        print("========================================", file=f)
+        print(incorrect_time_taken_fit.diagnose(), file=f)
+        print(incorrect_time_taken_fit.summary().to_string(), file=f)
+        posterior[f"incorrect_mu{task}"] = get_var(
+            incorrect_time_taken_fit,
+            "mu",
+        )
+        posteriorES[f"incorrect_logmu{task}"] = get_var(
+            incorrect_time_taken_fit,
+            "logmuES",
+        )
 
 # %% Plot effect size posterior distributions
 
@@ -157,22 +200,39 @@ for task in TASKS:
         labels=interfaces["interface_label"],
         colors=interfaces["interface_color"],
         measure="Probability of success",
+        better_notion="better",
+        worse_notion="worse",
         better="greater",
-        bins=np.arange(-3, 3.1, 0.05),
+        bins=np.arange(-3, 3.0001, 0.05),
         step=1,
         figsize=(6, 4),
     )[0].save(f"output/04-theta{task}.pdf")
 
     lib.es_plot(
-        posteriorES[f"logmu{task}"],
+        posteriorES[f"correct_logmu{task}"],
         labels=interfaces["interface_label"],
         colors=interfaces["interface_color"],
         measure="Time taken",
+        better_notion="faster",
+        worse_notion="slower",
         better="less",
-        bins=np.arange(-3, 3, 0.05),
+        bins=np.arange(-5, 5.0001, 0.05),
         step=1,
         figsize=(6, 4),
-    )[0].save(f"output/04-mu{task}.pdf")
+    )[0].save(f"output/05-correct_mu{task}.pdf")
+
+    lib.es_plot(
+        posteriorES[f"incorrect_logmu{task}"],
+        labels=interfaces["interface_label"],
+        colors=interfaces["interface_color"],
+        measure="Time taken",
+        better_notion="faster",
+        worse_notion="slower",
+        better="less",
+        bins=np.arange(-5, 5.0001, 0.05),
+        step=1,
+        figsize=(6, 4),
+    )[0].save(f"output/06-incorrect_mu{task}.pdf")
 
 # %% Output summary statistics of the posteriors
 
@@ -203,10 +263,17 @@ for task in TASKS:
     )
 
     data |= summary(
-        posterior[f"mu{task}"],
-        posteriorES[f"logmu{task}"][:, :, :, 0],
+        posterior[f"correct_mu{task}"],
+        posteriorES[f"correct_logmu{task}"][:, :, :, 0],
         lambda x: x < 0,
-        prefix=f"mu{task}",
+        prefix=f"correct_mu{task}",
+    )
+
+    data |= summary(
+        posterior[f"incorrect_mu{task}"],
+        posteriorES[f"incorrect_logmu{task}"][:, :, :, 0],
+        lambda x: x < 0,
+        prefix=f"incorrect_mu{task}",
     )
 
 stats = interfaces.join(
@@ -216,3 +283,14 @@ stats = interfaces.join(
 )
 
 stats.write_csv("output/stats.csv")
+
+# %% Make teaser figure graphs
+
+importlib.reload(lib)
+for row in stats.iter_rows(named=True):
+    iid = row["interface_id"]
+    label = row["interface_label"]
+    lib.teaser_plot(
+        [row[f"theta{task}_p"] for task in TASKS],
+        color=row["interface_color"],
+    )[0].save(f"output/teaser/{iid}-theta-{label}.svg")
