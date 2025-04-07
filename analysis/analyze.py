@@ -70,17 +70,21 @@ wide = wide.join(
 
 # % % Descriptive plots
 
+figsize = (4, 2)
+label_fontsize = 8
+
+importlib.reload(lib)
 lib.distribution_comparison_plot(
     wide,
     group_feature="interface_label",
     value_feature="exp",
     sort_feature="interface_id",
     color_feature="interface_color",
-    yticks=np.arange(0, 11, 1),
-    figsize=(6, 4),
+    yticks=np.arange(0, 11, 2),
+    figsize=figsize,
+    label_fontsize=label_fontsize,
 )[0].save("output/01-exp.pdf")
 
-importlib.reload(lib)
 for task in TASKS:
     lib.count_comparison_plot(
         wide,
@@ -89,7 +93,8 @@ for task in TASKS:
         sort_feature="interface_id",
         color_feature="interface_color",
         step=2,
-        figsize=(6, 4),
+        figsize=figsize,
+        label_fontsize=label_fontsize - 1,
     )[0].save(f"output/02-correct{task}.pdf")
 
     lib.distribution_comparison_plot(
@@ -98,9 +103,21 @@ for task in TASKS:
         value_feature=f"taskTime{task}",
         sort_feature="interface_id",
         color_feature="interface_color",
-        yticks=np.arange(0, 51, 5),
-        figsize=(6, 4),
-    )[0].save(f"output/03-time_taken{task}.pdf")
+        yticks=np.arange(0, 61, 10),
+        figsize=figsize,
+        label_fontsize=label_fontsize,
+    )[0].save(f"output/03-correct_time_taken{task}.pdf")
+
+    lib.distribution_comparison_plot(
+        wide.filter(~pl.col(f"correct{task}")),
+        group_feature="interface_label",
+        value_feature=f"taskTime{task}",
+        sort_feature="interface_id",
+        color_feature="interface_color",
+        yticks=np.arange(0, 61, 10),
+        figsize=figsize,
+        label_fontsize=label_fontsize,
+    )[0].save(f"output/03-incorrect_time_taken{task}.pdf")
 
 # %% Run Bayesian inference
 
@@ -205,7 +222,7 @@ for task in TASKS:
         better="greater",
         bins=np.arange(-3, 3.0001, 0.05),
         step=1,
-        figsize=(6, 4),
+        figsize=(9, 3),
     )[0].save(f"output/04-theta{task}.pdf")
 
     lib.es_plot(
@@ -218,7 +235,7 @@ for task in TASKS:
         better="less",
         bins=np.arange(-5, 5.0001, 0.05),
         step=1,
-        figsize=(6, 4),
+        figsize=(9, 3),
     )[0].save(f"output/05-correct_mu{task}.pdf")
 
     lib.es_plot(
@@ -231,7 +248,7 @@ for task in TASKS:
         better="less",
         bins=np.arange(-5, 5.0001, 0.05),
         step=1,
-        figsize=(6, 4),
+        figsize=(9, 3),
     )[0].save(f"output/06-incorrect_mu{task}.pdf")
 
 # %% Output summary statistics of the posteriors
