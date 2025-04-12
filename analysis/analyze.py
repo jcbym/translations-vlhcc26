@@ -83,6 +83,7 @@ lib.distribution_comparison_plot(
     yticks=np.arange(0, 11, 2),
     figsize=figsize,
     label_fontsize=label_fontsize,
+    caption="Figure 3.",
 )[0].save("output/01-exp.pdf")
 
 for task in TASKS:
@@ -106,6 +107,7 @@ for task in TASKS:
         yticks=np.arange(0, 61, 10),
         figsize=figsize,
         label_fontsize=label_fontsize,
+        caption=f"Figure B2.{task}.",
     )[0].save(f"output/03-correct_time_taken{task}.pdf")
 
     lib.distribution_comparison_plot(
@@ -117,7 +119,12 @@ for task in TASKS:
         yticks=np.arange(0, 61, 10),
         figsize=figsize,
         label_fontsize=label_fontsize,
+        caption=f"Figure B3.{task}.",
     )[0].save(f"output/03-incorrect_time_taken{task}.pdf")
+
+import sys
+
+sys.exit(0)
 
 # %% Run Bayesian inference
 

@@ -305,12 +305,16 @@ def distribution_comparison_plot(
     yticks,
     figsize,
     label_fontsize,
+    caption=None,
 ):
     assert df[value_feature].is_between(min(yticks), max(yticks)).all()
 
     labels = []
     colors = []
     vals = []
+
+    if caption:
+        print(caption, end=" ")
 
     for (label,), g in df.sort(
         by=sort_feature,
@@ -321,6 +325,17 @@ def distribution_comparison_plot(
         labels.append(label)
         colors.append(g[color_feature].first())
         vals.append(g[value_feature])
+
+        q1 = round(np.quantile(g[value_feature], 0.25), 1)
+        q2 = round(np.quantile(g[value_feature], 0.5), 1)
+        q3 = round(np.quantile(g[value_feature], 0.75), 1)
+
+        if caption:
+            print(f"{label}, median {q2}, (Q1 {q1}, Q3 {q3}).", end=" ")
+
+    if caption:
+        print()
+
     fig, ax = plt.subplots(1, 1, figsize=figsize)
     xticks = np.arange(len(labels))
     bplot = ax.boxplot(
