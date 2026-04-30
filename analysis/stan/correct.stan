@@ -27,7 +27,8 @@ generated quantities {
   matrix[I, I] thetaES;
   for (i1 in 1:I) {
     for (i2 in 1:I) {
-      thetaES[i1, i2] = 2 * asin(sqrt(theta[i1])) - 2 * asin(sqrt(theta[i2]));
+      // thetaES[i1, i2] = 2 * asin(sqrt(theta[i1])) - 2 * asin(sqrt(theta[i2]));
+      thetaES[i1, i2] = theta[i1] - theta[i2];
     }
   }
 }

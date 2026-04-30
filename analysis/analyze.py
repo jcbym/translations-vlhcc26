@@ -2,7 +2,7 @@
 
 import lib
 
-import arviz as az
+import arviz_stats as azs
 import importlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -68,10 +68,10 @@ wide = wide.join(
     validate="m:1",
 )
 
-# % % Descriptive plots
+# %% Descriptive plots
 
-figsize = (4, 2)
-label_fontsize = 8
+figsize = (2.75, 2)
+label_fontsize = 5
 
 importlib.reload(lib)
 lib.distribution_comparison_plot(
@@ -122,9 +122,6 @@ for task in TASKS:
         caption=f"Figure B3.{task}.",
     )[0].save(f"output/03-incorrect_time_taken{task}.pdf")
 
-import sys
-
-sys.exit(0)
 
 # %% Run Bayesian inference
 
@@ -227,9 +224,12 @@ for task in TASKS:
         better_notion="better",
         worse_notion="worse",
         better="greater",
-        bins=np.arange(-3, 3.0001, 0.05),
+        bins=np.arange(-1, 1.0001, 0.01),
         step=1,
-        figsize=(9, 3),
+        figsize=(4, 2.5),
+        fontsize=7,
+        xticks=np.arange(-1, 1.001, 0.25),
+        round_amount=2,
     )[0].save(f"output/04-theta{task}.pdf")
 
     lib.es_plot(
@@ -240,9 +240,12 @@ for task in TASKS:
         better_notion="faster",
         worse_notion="slower",
         better="less",
-        bins=np.arange(-5, 5.0001, 0.05),
+        bins=np.arange(-20, 20.0001, 0.1),
         step=1,
-        figsize=(9, 3),
+        figsize=(4, 2.5),
+        fontsize=7,
+        xticks=np.arange(-20, 20.0001, 5).astype(int),
+        round_amount=1,
     )[0].save(f"output/05-correct_mu{task}.pdf")
 
     lib.es_plot(
@@ -253,17 +256,26 @@ for task in TASKS:
         better_notion="faster",
         worse_notion="slower",
         better="less",
-        bins=np.arange(-5, 5.0001, 0.05),
+        bins=np.arange(-90, 90.0001, 0.1),
         step=1,
-        figsize=(9, 3),
+        figsize=(4, 2.5),
+        fontsize=7,
+        xticks=np.arange(-90, 90.0001, 15).astype(int),
+        round_amount=1,
     )[0].save(f"output/06-incorrect_mu{task}.pdf")
 
 # %% Output summary statistics of the posteriors
 
 
+def hdi_many(x, *, prob):
+    return np.array(
+        [azs.hdi(x[0, :, c], prob=prob) for c in range(0, x.shape[2])]
+    )
+
+
 def summary(x, es, es_criteria, *, prefix, hdi_prob=0.95):
-    x_hdi = az.hdi(x, hdi_prob=hdi_prob)
-    es_hdi = az.hdi(es, hdi_prob=hdi_prob)
+    x_hdi = hdi_many(x, prob=hdi_prob)
+    es_hdi = hdi_many(es, prob=hdi_prob)
 
     return {
         f"{prefix}_mean": x.mean(axis=(0, 1)),

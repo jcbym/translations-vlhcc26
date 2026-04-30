@@ -1,4 +1,4 @@
-import arviz as az
+import arviz_stats as azs
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -47,6 +47,7 @@ def es_plot(
     *,
     measure,
     better_notion,
+    xticks,
     worse_notion,
     better,
     labels,
@@ -54,11 +55,13 @@ def es_plot(
     bins,
     step,
     figsize,
+    round_amount,
     hdi_prob=0.95,
     fontsize=9,
     xlabel_fontsize=14,
 ):
     assert better in {"greater", "less"}
+    assert round_amount in {1, 2}
 
     es = es_draws[:, :, :, 0].mean(axis=0).T[1:]
     labels = labels[1:]
@@ -78,7 +81,7 @@ def es_plot(
             bins=bins,
             color="0.8",
             edgecolor="0",
-            linewidth=0.05,
+            linewidth=0.00,
         )
         ymax = 1.1 * max(n)
         ax[i].set_ylim(0, ymax)
@@ -89,7 +92,11 @@ def es_plot(
                 better == "less" and p.get_x() + p.get_width() < 0
             ):
                 p.set_facecolor(colors[i])
-        ax[i].set_xticks(np.arange(min(bins), max(bins) + step / 2, step))
+        if xticks is not None:
+            xt = xticks
+        else:
+            xt = np.arange(min(bins), max(bins) + step / 2, step)
+        ax[i].set_xticks(xt, labels=xt, fontsize=fontsize)
         if i < N - 1:
             ax[i].set_xticks([])
 
@@ -122,7 +129,7 @@ def es_plot(
             + r"}) \approx $"
             + f"{pb:0.2f}",
             ha=pb_ha,
-            va="center",
+            va="bottom",
             color=colors[i],
             fontsize=fontsize,
         )
@@ -135,7 +142,7 @@ def es_plot(
             + r"}) \approx $"
             + f"{1 - pb:0.2f}",
             ha=pw_ha,
-            va="center",
+            va="bottom",
             color="0.4",
             fontsize=fontsize,
         )
@@ -154,7 +161,7 @@ def es_plot(
         ax[i].text(
             mode,
             0.6 * ymax,
-            f"{mode:+0.2f}",
+            f"{mode:+0.2f}" if round_amount == 2 else f"{mode:+0.1f}",
             fontsize=fontsize,
             color=colors[i],
             va="top",
@@ -166,24 +173,24 @@ def es_plot(
                 lw=0.5,
             ),
         )
-        ax[i].axvline(x=mode, lw=1, c="1")
+        ax[i].axvline(x=mode, lw=0.5, c="1")
 
-        lo, hi = az.hdi(es[i], hdi_prob=hdi_prob)
+        lo, hi = azs.hdi(es[i], prob=hdi_prob)
         ax[i].plot(
             [lo, hi],
             [0.1 * ymax, 0.1 * ymax],
             color="1",
-            lw=1,
+            lw=0.5,
         )
 
         ax[i].text(
             lo,
             0.2 * ymax,
-            f"{lo:+0.2f}",
+            f"{lo:+0.2f}" if round_amount == 2 else f"{lo:+0.1f}",
             fontsize=fontsize,
             color=colors[i],
             va="bottom",
-            ha="center",
+            ha="right",
             bbox=dict(
                 pad=0.5,
                 facecolor="1",
@@ -195,11 +202,11 @@ def es_plot(
         ax[i].text(
             hi,
             0.2 * ymax,
-            f"{hi:+0.2f}",
+            f"{hi:+0.2f}" if round_amount == 2 else f"{hi:+0.1f}",
             fontsize=fontsize,
             color=colors[i],
             va="bottom",
-            ha="center",
+            ha="left",
             bbox=dict(
                 pad=0.5,
                 facecolor="1",
@@ -274,6 +281,7 @@ def count_comparison_plot(
             for r in data.iter_rows(named=True)
         ],
         padding=3,
+        fontsize=1.5 * label_fontsize,
     )
     ax.set_xticks(
         xticks,
@@ -284,7 +292,7 @@ def count_comparison_plot(
     for xt, bl, c in zip(ax.get_xticklabels(), ax.texts, data["color"]):
         bl.set_color(c)
         xt.set_color(c)
-    ax.set_yticks(yticks, labels=yticks, fontsize=12)
+    ax.set_yticks(yticks, labels=yticks, fontsize=label_fontsize * 1.5)
     ax.set_ylim(min(yticks), max(yticks) + 1)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -306,8 +314,11 @@ def distribution_comparison_plot(
     figsize,
     label_fontsize,
     caption=None,
+    show_boxplots=False,
 ):
     assert df[value_feature].is_between(min(yticks), max(yticks)).all()
+
+    np.random.seed(0)
 
     labels = []
     colors = []
@@ -338,75 +349,114 @@ def distribution_comparison_plot(
 
     fig, ax = plt.subplots(1, 1, figsize=figsize)
     xticks = np.arange(len(labels))
-    bplot = ax.boxplot(
-        vals,
-        positions=xticks,
-        patch_artist=True,
-        showcaps=False,
-    )
+    for i in range(len(labels)):
+        spread = 0.1
+        x = xticks[i] + np.random.uniform(-spread, spread, size=len(vals[i]))
+        ax.scatter(
+            x,
+            vals[i],
+            c=colors[i],
+            alpha=0.5,
+        )
+        if not show_boxplots:
+            med = vals[i].median()
+            ax.hlines(
+                y=med,
+                xmin=xticks[i] - 0.3,
+                xmax=xticks[i] + 0.3,
+                color=colors[i],
+                lw=2,
+            )
+            ax.annotate(
+                f"{med:.1f}",
+                xy=(xticks[i], med),
+                xytext=(0, 1),
+                textcoords="offset points",
+                ha="center",
+                va="bottom",
+                color=colors[i],
+                fontsize=7,
+                bbox=dict(
+                    boxstyle="square,pad=0.05",
+                    fc="1",
+                    ec=colors[i],
+                    lw=0.5,
+                    alpha=0.75,
+                ),
+            )
+
     ax.set_xticks(
         xticks,
         labels=labels,
         fontsize=label_fontsize,
         fontweight="bold",
     )
-    boxplot_alpha = 1
-    for box, flier, med, xt, v, c in zip(
-        bplot["boxes"],
-        bplot["fliers"],
-        bplot["medians"],
-        ax.get_xticklabels(),
-        vals,
-        colors,
-    ):
-        box.set_facecolor((c, 0.5))
-        box.set_edgecolor((c, 1))
-        box.set_linewidth(1)
+    for xt, c in zip(ax.get_xticklabels(), colors):
         xt.set_color(c)
-        med.set_alpha(boxplot_alpha)
-        med.set_color(c)
-        med.set_linewidth(2)
-        flier.set(
-            marker="o",
-            markerfacecolor=c,
-            markeredgecolor="1",
-            linewidth=0,
+
+    if show_boxplots:
+        bplot = ax.boxplot(
+            vals,
+            positions=xticks,
+            patch_artist=True,
+            showcaps=False,
         )
-        x = med.get_xdata().mean()
-        y = med.get_ydata().mean()
-        ax.text(
-            x,
-            y,
-            "",  # f"{y:.1f}",
-            ha="center",
-            va="center",
-            color="1",
-            fontsize=7,
-            bbox=dict(
-                boxstyle="square,pad=0.05",
-                fc=c,
-                ec="none",
-            ),
-        )
-        np.random.seed(0)
-        spread = 0.3
-        ax.scatter(
-            x + np.random.uniform(low=-spread, high=spread, size=len(v)),
-            v,
-            color=c,
-            zorder=10,
-            s=20,
-            alpha=1,
-            lw=0,
-            marker="",
-            # ec="0",
-        )
-    for i, whis in enumerate(bplot["whiskers"]):
-        c = colors[i // 2]
-        whis.set_color(c)
-        whis.set_alpha(boxplot_alpha)
-        whis.set_linewidth(1)
-    ax.set_yticks(yticks, labels=yticks, fontsize=12)
+        boxplot_alpha = 1
+        for box, flier, med, v, c in zip(
+            bplot["boxes"],
+            bplot["fliers"],
+            bplot["medians"],
+            vals,
+            colors,
+        ):
+            box.set_facecolor((c, 0.5))
+            box.set_edgecolor((c, 1))
+            box.set_linewidth(1)
+            med.set_alpha(boxplot_alpha)
+            med.set_color(c)
+            med.set_linewidth(2)
+            flier.set(
+                marker="o",
+                markerfacecolor=c,
+                markeredgecolor="1",
+                linewidth=0,
+            )
+            x = med.get_xdata().mean()
+            y = med.get_ydata().mean()
+            ax.text(
+                x,
+                y,
+                f"{y:.1f}",
+                ha="center",
+                va="center",
+                color="1",
+                fontsize=7,
+                bbox=dict(
+                    boxstyle="square,pad=0.05",
+                    fc=c,
+                    ec="none",
+                ),
+            )
+            np.random.seed(0)
+            spread = 0.3
+            ax.scatter(
+                x + np.random.uniform(low=-spread, high=spread, size=len(v)),
+                v,
+                color=c,
+                zorder=10,
+                s=20,
+                alpha=1,
+                lw=0,
+                marker="",
+                # ec="0",
+            )
+        for i, whis in enumerate(bplot["whiskers"]):
+            c = colors[i // 2]
+            whis.set_color(c)
+            whis.set_alpha(boxplot_alpha)
+            whis.set_linewidth(1)
+
+    ax.set_yticks(yticks, labels=yticks, fontsize=label_fontsize * 1.5)
     ax.set_ylim(min(yticks), max(yticks))
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)

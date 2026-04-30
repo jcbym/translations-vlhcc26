@@ -10,12 +10,14 @@ dependencies = [
     "numpy>=2.1.1",
     "cmdstanpy>=1.2.5",
     "arviz>=0.21.0",
+    "arviz-base>=1.1.0",
+    "arviz-stats>=1.1.0",
 ]
 
 [tool.ruff]
 line-length = 80
 
-[tool.uv]
-dev-dependencies = [
-    "ipython>=9.0.2",
+[dependency-groups]
+dev = [
+    "ipython>=9.13.0",
 ]
