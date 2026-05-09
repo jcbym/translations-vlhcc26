@@ -255,6 +255,7 @@ def count_comparison_plot(
     step,
     figsize,
     label_fontsize,
+    compressed=False,
 ):
     data = (
         df.sort(by=sort_feature)
@@ -280,14 +281,15 @@ def count_comparison_plot(
             f"{r['sum']}\n({r['sum'] / r['total']:.0%})"
             for r in data.iter_rows(named=True)
         ],
-        padding=3,
-        fontsize=1.5 * label_fontsize,
+        padding=2 if compressed else 3,
+        fontsize=3 if compressed else 1.5 * label_fontsize,
     )
     ax.set_xticks(
         xticks,
         labels=data[group_feature],
         fontsize=label_fontsize,
         fontweight="bold",
+        rotation="vertical" if compressed else None,
     )
     for xt, bl, c in zip(ax.get_xticklabels(), ax.texts, data["color"]):
         bl.set_color(c)
@@ -315,6 +317,7 @@ def distribution_comparison_plot(
     label_fontsize,
     caption=None,
     show_boxplots=False,
+    compressed=False,
 ):
     assert df[value_feature].is_between(min(yticks), max(yticks)).all()
 
@@ -356,7 +359,7 @@ def distribution_comparison_plot(
             x,
             vals[i],
             c=colors[i],
-            alpha=0.5,
+            alpha=0.3,
         )
         if not show_boxplots:
             med = vals[i].median()
@@ -375,13 +378,13 @@ def distribution_comparison_plot(
                 ha="center",
                 va="bottom",
                 color=colors[i],
-                fontsize=7,
+                fontsize=4.5 if compressed else 7,
                 bbox=dict(
                     boxstyle="square,pad=0.05",
                     fc="1",
                     ec=colors[i],
                     lw=0.5,
-                    alpha=0.75,
+                    alpha=0.8,
                 ),
             )
 
@@ -389,6 +392,7 @@ def distribution_comparison_plot(
         xticks,
         labels=labels,
         fontsize=label_fontsize,
+        rotation="vertical" if compressed else None,
         fontweight="bold",
     )
     for xt, c in zip(ax.get_xticklabels(), colors):

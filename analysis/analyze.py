@@ -71,6 +71,7 @@ wide = wide.join(
 # %% Descriptive plots
 
 figsize = (2.75, 2)
+compressed_figsize = (1.4, 1.7)
 label_fontsize = 5
 
 importlib.reload(lib)
@@ -81,9 +82,10 @@ lib.distribution_comparison_plot(
     sort_feature="interface_id",
     color_feature="interface_color",
     yticks=np.arange(0, 11, 2),
-    figsize=figsize,
+    figsize=(3, 1.2),
     label_fontsize=label_fontsize,
     caption="Figure 3.",
+    compressed=False,
 )[0].save("output/01-exp.pdf")
 
 for task in TASKS:
@@ -94,8 +96,9 @@ for task in TASKS:
         sort_feature="interface_id",
         color_feature="interface_color",
         step=2,
-        figsize=figsize,
-        label_fontsize=label_fontsize - 1,
+        figsize=(3, 1.3),
+        label_fontsize=label_fontsize,
+        compressed=False,
     )[0].save(f"output/02-correct{task}.pdf")
 
     lib.distribution_comparison_plot(
@@ -105,9 +108,10 @@ for task in TASKS:
         sort_feature="interface_id",
         color_feature="interface_color",
         yticks=np.arange(0, 61, 10),
-        figsize=figsize,
+        figsize=(3, 1.3),
         label_fontsize=label_fontsize,
         caption=f"Figure B2.{task}.",
+        compressed=False,
     )[0].save(f"output/03-correct_time_taken{task}.pdf")
 
     lib.distribution_comparison_plot(
@@ -117,11 +121,15 @@ for task in TASKS:
         sort_feature="interface_id",
         color_feature="interface_color",
         yticks=np.arange(0, 61, 10),
-        figsize=figsize,
+        figsize=compressed_figsize,
         label_fontsize=label_fontsize,
         caption=f"Figure B3.{task}.",
+        compressed=False,
     )[0].save(f"output/03-incorrect_time_taken{task}.pdf")
 
+import sys
+
+sys.exit(0)
 
 # %% Run Bayesian inference
 
